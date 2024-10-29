@@ -12,8 +12,9 @@
 #include <iomanip> 
 #include <iostream>
 #include <chrono>
+#include <string>
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
+void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
@@ -72,6 +73,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.background        = color(0.70, 0.80, 1.00);
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
+    renderer.filename          = filename;
 
     renderer.vfov     = 20;
     renderer.lookfrom = point3(13,2,3);
@@ -85,7 +87,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 }
 
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
+void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -129,6 +131,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.background        = color(0,0,0);
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
+    renderer.filename          = filename;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(278, 278, -800);
@@ -140,7 +143,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.render(world, lights);
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
+void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -183,6 +186,7 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     renderer.background        = color(0,0,0);
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
+    renderer.filename          = filename;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(278, 278, -800);
@@ -194,7 +198,7 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     renderer.render(world, lights);
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
+void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -269,6 +273,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.background        = color(0,0,0);
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
+    renderer.filename          = filename;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(478, 278, -600);
@@ -286,21 +291,22 @@ int main() {
     int scene = 2;         
 
     // Acceleration technique selection
-    bool use_openmp = false;
-    int num_threads = 8;
+    bool use_openmp = true;
+    int num_threads = 16;
 
     // Hyperparameters
-    int image_width = 600;                // Rendered image width in pixel count
+    int image_width = 1000;               // Rendered image width in pixel count
     double aspect_ratio = 1.0;            // Ratio of image width over height
-    int samples_per_pixel = 30;           // Count of random samples for each pixel
-    int max_depth = 20;                   // Maximum number of ray bounces into scene
+    int samples_per_pixel = 100;          // Count of random samples for each pixel
+    int max_depth = 50;                   // Maximum number of ray bounces into scene
+    std::string filename = "test.ppm";    // Output file name
 
     auto startTime = std::chrono::high_resolution_clock::now();
     switch (scene) {
-        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
-        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
-        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);   break;
-        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
+        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
+        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
+        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);   break;
+        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
     }
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = endTime - startTime;

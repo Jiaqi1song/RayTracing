@@ -5,6 +5,7 @@
 #include "pdf.h"
 #include "material.h"
 #include <omp.h>
+#include <string>
 
 class camera {
   public:
@@ -15,7 +16,10 @@ class camera {
     color  background;               // Scene background color
     bool   use_openmp = false;       // Use OpenMP
     int    num_threads = 8;          
-
+    Image* image = NULL;
+    char filepath[1024];
+    std::string filename = "image.ppm";
+    
     double vfov     = 90;              // Vertical view angle (field of view)
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
     point3 lookat   = point3(0,0,-1);  // Point camera is looking at
@@ -27,8 +31,6 @@ class camera {
     void render(const hittable& world, const hittable& lights) {
         initialize();
 
-        std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
-
         if (use_openmp) {
             omp_set_num_threads(num_threads);
             std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
@@ -36,9 +38,6 @@ class camera {
             std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
         }
         
-        // TODO: Implement shared image data structure and write image into PPM 
-        //       We can use the code from asst2
-
         #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
         for (int j = 0; j < image_height; j++) {
             for (int i = 0; i < image_width; i++) {
@@ -50,11 +49,14 @@ class camera {
                         pixel_color += ray_color(r, max_depth, world, lights);
                     }
                 }
-                write_color(std::cout, pixel_samples_scale * pixel_color);
+
+                int* imgPtr = &image->data[3 * (j * image_width + i)];
+                write_color(imgPtr, pixel_samples_scale * pixel_color);
             }
         }
 
-        std::clog << "\rRendering Done.                     \n";
+        std::clog << "\rRendering Done. Writing image to " << filename.c_str() << ".         \n";
+        writePPMImage(image, filepath);
     }
 
   private:
@@ -73,6 +75,14 @@ class camera {
     void initialize() {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
+
+        // Allocate image
+        if (image) delete image;
+        image = new Image(image_width, image_height);
+        image->clear(0,0,0);
+
+        // Output file path
+        sprintf(filepath, "./images/%s", filename.c_str());
 
         sqrt_spp = int(std::sqrt(samples_per_pixel));
         pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);

@@ -3,7 +3,7 @@
 
 #include "interval.h"
 #include "vec3.h"
-
+#include <stdlib.h>
 
 using color = vec3;
 
@@ -17,7 +17,7 @@ inline double linear_to_gamma(double linear_component)
 }
 
 
-void write_color(std::ostream& out, const color& pixel_color) {
+void write_color(int* pixelData, const color& pixel_color) {
     auto r = pixel_color.x();
     auto g = pixel_color.y();
     auto b = pixel_color.z();
@@ -39,7 +39,58 @@ void write_color(std::ostream& out, const color& pixel_color) {
     int bbyte = int(256 * intensity.clamp(b));
 
     // Write out the pixel color components.
-    out << rbyte << ' ' << gbyte << ' ' << bbyte << '\n';
+    pixelData[0] = rbyte;
+    pixelData[1] = gbyte;
+    pixelData[2] = bbyte;
+}
+
+struct Image {
+
+    Image(int w, int h) {
+        width = w;
+        height = h;
+        data = new int[3 * width * height];
+    }
+
+    void clear(int r, int g, int b) {
+
+        int numPixels = width * height;
+        int* ptr = data;
+        for (int i=0; i<numPixels; i++) {
+            ptr[0] = r;
+            ptr[1] = g;
+            ptr[2] = b;
+            ptr += 3;
+        }
+    }
+
+    int width;
+    int height;
+    int* data;
+};
+
+void writePPMImage(const Image* image, const char *filename)
+{
+    FILE *fp = fopen(filename, "wb");
+
+    if (!fp) {
+        fprintf(stderr, "Error: could not open %s for write\n", filename);
+        exit(1);
+    }
+
+    // write ppm header
+    fprintf(fp, "P3\n");
+    fprintf(fp, "%d %d\n", image->width, image->height);
+    fprintf(fp, "255\n");
+
+    for (int j = 0; j < image->height; j++) {
+        for (int i = 0; i < image->width; i++) {
+            const int* ptr = &image->data[3 * (j*image->width + i)];
+            fprintf(fp, "%d %d %d\n", ptr[0], ptr[1], ptr[2]);
+        }
+    }
+
+    fclose(fp);
 }
 
 
