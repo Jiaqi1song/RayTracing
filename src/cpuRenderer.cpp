@@ -13,7 +13,7 @@
 #include <iostream>
 #include <chrono>
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth) {
+void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
     hittable_list world;
 
     auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
@@ -63,27 +63,29 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     hittable_list lights;
     lights.add(make_shared<sphere>(point3(0,-1000,0), 1, empty_material));
     
-    camera cam;
+    camera renderer;
 
-    cam.aspect_ratio      = aspect_ratio;
-    cam.image_width       = image_width;
-    cam.samples_per_pixel = samples_per_pixel;
-    cam.max_depth         = max_depth;
-    cam.background        = color(0.70, 0.80, 1.00);
+    renderer.aspect_ratio      = aspect_ratio;
+    renderer.image_width       = image_width;
+    renderer.samples_per_pixel = samples_per_pixel;
+    renderer.max_depth         = max_depth;
+    renderer.background        = color(0.70, 0.80, 1.00);
+    renderer.use_openmp        = use_openmp;
+    renderer.num_threads       = num_threads;
 
-    cam.vfov     = 20;
-    cam.lookfrom = point3(13,2,3);
-    cam.lookat   = point3(0,0,0);
-    cam.vup      = vec3(0,1,0);
+    renderer.vfov     = 20;
+    renderer.lookfrom = point3(13,2,3);
+    renderer.lookat   = point3(0,0,0);
+    renderer.vup      = vec3(0,1,0);
 
-    cam.defocus_angle = 0.6;
-    cam.focus_dist    = 10.0;
+    renderer.defocus_angle = 0.6;
+    renderer.focus_dist    = 10.0;
 
-    cam.render(world, lights);
+    renderer.render(world, lights);
 }
 
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth) {
+void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -118,25 +120,27 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
         make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
     lights.add(make_shared<sphere>(point3(190, 90, 190), 90, empty_material));
 
-    camera cam;
+    camera renderer;
 
-    cam.aspect_ratio      = aspect_ratio;
-    cam.image_width       = image_width;
-    cam.samples_per_pixel = samples_per_pixel;
-    cam.max_depth         = max_depth;
-    cam.background        = color(0,0,0);
+    renderer.aspect_ratio      = aspect_ratio;
+    renderer.image_width       = image_width;
+    renderer.samples_per_pixel = samples_per_pixel;
+    renderer.max_depth         = max_depth;
+    renderer.background        = color(0,0,0);
+    renderer.use_openmp        = use_openmp;
+    renderer.num_threads       = num_threads;
 
-    cam.vfov     = 40;
-    cam.lookfrom = point3(278, 278, -800);
-    cam.lookat   = point3(278, 278, 0);
-    cam.vup      = vec3(0, 1, 0);
+    renderer.vfov     = 40;
+    renderer.lookfrom = point3(278, 278, -800);
+    renderer.lookat   = point3(278, 278, 0);
+    renderer.vup      = vec3(0, 1, 0);
 
-    cam.defocus_angle = 0;
+    renderer.defocus_angle = 0;
 
-    cam.render(world, lights);
+    renderer.render(world, lights);
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth) {
+void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -170,25 +174,27 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     hittable_list lights;
     lights.add(make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
 
-    camera cam;
+    camera renderer;
 
-    cam.aspect_ratio      = aspect_ratio;
-    cam.image_width       = image_width;
-    cam.samples_per_pixel = samples_per_pixel;
-    cam.max_depth         = max_depth;
-    cam.background        = color(0,0,0);
+    renderer.aspect_ratio      = aspect_ratio;
+    renderer.image_width       = image_width;
+    renderer.samples_per_pixel = samples_per_pixel;
+    renderer.max_depth         = max_depth;
+    renderer.background        = color(0,0,0);
+    renderer.use_openmp        = use_openmp;
+    renderer.num_threads       = num_threads;
 
-    cam.vfov     = 40;
-    cam.lookfrom = point3(278, 278, -800);
-    cam.lookat   = point3(278, 278, 0);
-    cam.vup      = vec3(0, 1, 0);
+    renderer.vfov     = 40;
+    renderer.lookfrom = point3(278, 278, -800);
+    renderer.lookat   = point3(278, 278, 0);
+    renderer.vup      = vec3(0, 1, 0);
 
-    cam.defocus_angle = 0;
+    renderer.defocus_angle = 0;
 
-    cam.render(world, lights);
+    renderer.render(world, lights);
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth) {
+void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -254,41 +260,47 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     hittable_list lights;
     lights.add(make_shared<quad>(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), empty_material));
     
-    camera cam;
+    camera renderer;
 
-    cam.aspect_ratio      = aspect_ratio;
-    cam.image_width       = image_width;
-    cam.samples_per_pixel = samples_per_pixel;
-    cam.max_depth         = max_depth;
-    cam.background        = color(0,0,0);
+    renderer.aspect_ratio      = aspect_ratio;
+    renderer.image_width       = image_width;
+    renderer.samples_per_pixel = samples_per_pixel;
+    renderer.max_depth         = max_depth;
+    renderer.background        = color(0,0,0);
+    renderer.use_openmp        = use_openmp;
+    renderer.num_threads       = num_threads;
 
-    cam.vfov     = 40;
-    cam.lookfrom = point3(478, 278, -600);
-    cam.lookat   = point3(278, 278, 0);
-    cam.vup      = vec3(0,1,0);
+    renderer.vfov     = 40;
+    renderer.lookfrom = point3(478, 278, -600);
+    renderer.lookat   = point3(278, 278, 0);
+    renderer.vup      = vec3(0,1,0);
 
-    cam.defocus_angle = 0;
+    renderer.defocus_angle = 0;
 
-    cam.render(world, lights);
+    renderer.render(world, lights);
 }
 
 
 int main() {
     // Scene selection
-    int scene = 0;                  
+    int scene = 2;         
+
+    // Acceleration technique selection
+    bool use_openmp = false;
+    int num_threads = 8;
 
     // Hyperparameters
     int image_width = 600;                // Rendered image width in pixel count
     double aspect_ratio = 1.0;            // Ratio of image width over height
-    int samples_per_pixel = 100;          // Count of random samples for each pixel
+    int samples_per_pixel = 30;           // Count of random samples for each pixel
     int max_depth = 20;                   // Maximum number of ray bounces into scene
 
     auto startTime = std::chrono::high_resolution_clock::now();
     switch (scene) {
-        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth);     break;
-        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth);     break;
-        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth);   break;
-        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth);     break;
+        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
+        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
+        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);   break;
+        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads);     break;
     }
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = endTime - startTime;

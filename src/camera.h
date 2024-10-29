@@ -4,7 +4,7 @@
 #include "hittable.h"
 #include "pdf.h"
 #include "material.h"
-
+#include <omp.h>
 
 class camera {
   public:
@@ -13,6 +13,8 @@ class camera {
     int    samples_per_pixel = 10;   // Count of random samples for each pixel
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
     color  background;               // Scene background color
+    bool   use_openmp = false;       // Use OpenMP
+    int    num_threads = 8;          
 
     double vfov     = 90;              // Vertical view angle (field of view)
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
@@ -27,7 +29,17 @@ class camera {
 
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-        std::clog << "\rStart Rendering " << image_height * image_width << " pixels.\n";
+        if (use_openmp) {
+            omp_set_num_threads(num_threads);
+            std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
+        } else {
+            std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
+        }
+        
+        // TODO: Implement shared image data structure and write image into PPM 
+        //       We can use the code from asst2
+
+        #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
         for (int j = 0; j < image_height; j++) {
             for (int i = 0; i < image_width; i++) {
                 std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
@@ -42,7 +54,7 @@ class camera {
             }
         }
 
-        std::clog << "\rRendering Done.\n";
+        std::clog << "\rRendering Done.                     \n";
     }
 
   private:

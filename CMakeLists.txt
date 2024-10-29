@@ -6,15 +6,15 @@ cmake_minimum_required ( VERSION 3.10.0...3.27.0 )
 
 project ( RayTracing LANGUAGES CXX )
 
-# Set to C++11
-set ( CMAKE_CXX_STANDARD          11 )
+# Set to C++17
+set ( CMAKE_CXX_STANDARD          17 )
 set ( CMAKE_CXX_STANDARD_REQUIRED ON )
-set ( CMAKE_CXX_EXTENSIONS        OFF )
+set ( CMAKE_CXX_EXTENSIONS        ON )
 
 # Source
 
-set ( SOURCES
-  src/main.cc
+set ( CPURENDERER
+  src/cpuRenderer.cpp
   src/stb_image.h
   src/aabb.h
   src/camera.h
@@ -66,5 +66,7 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Executables
-add_executable(raytracer ${SOURCES})
+add_executable(cpuRayTracer ${CPURENDERER})
 
+find_package(OpenMP)
+target_link_libraries(cpuRayTracer PUBLIC OpenMP::OpenMP_CXX)

@@ -3,4 +3,8 @@
 # Build the code and render the image
 
 cmake --build build --config release
-./build/raytracer > ./images/image.ppm
+
+# CPU ray tracer
+./build/cpuRayTracer > ./images/image.ppm
+
+# CUDA ray tracer
