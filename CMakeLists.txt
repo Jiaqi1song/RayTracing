@@ -14,26 +14,26 @@ set ( CMAKE_CXX_EXTENSIONS        ON )
 # Source
 
 set ( CPURENDERER
-  src/cpuRenderer.cpp
-  src/stb_image.h
-  src/aabb.h
-  src/camera.h
-  src/color.h
-  src/constant_medium.h
-  src/hittable.h
-  src/hittable_list.h
-  src/interval.h
-  src/material.h
-  src/onb.h
-  src/pdf.h
-  src/perlin.h
-  src/quad.h
-  src/ray.h
-  src/stb_image_utils.h
-  src/utils.h
-  src/sphere.h
-  src/texture.h
-  src/vec3.h
+  src/cpu/cpuRenderer.cpp
+  src/cpu/stb_image.h
+  src/cpu/aabb.h
+  src/cpu/camera.h
+  src/cpu/color.h
+  src/cpu/constant_medium.h
+  src/cpu/hittable.h
+  src/cpu/hittable_list.h
+  src/cpu/interval.h
+  src/cpu/material.h
+  src/cpu/onb.h
+  src/cpu/pdf.h
+  src/cpu/perlin.h
+  src/cpu/quad.h
+  src/cpu/ray.h
+  src/cpu/stb_image_utils.h
+  src/cpu/utils.h
+  src/cpu/sphere.h
+  src/cpu/texture.h
+  src/cpu/vec3.h
 )
 
 include_directories(src)

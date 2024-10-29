@@ -42,7 +42,7 @@ class camera {
         #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
         for (int j = 0; j < image_height; j++) {
             for (int i = 0; i < image_width; i++) {
-                std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
                 color pixel_color(0,0,0);
                 for (int s_j = 0; s_j < sqrt_spp; s_j++) {
                     for (int s_i = 0; s_i < sqrt_spp; s_i++) {
