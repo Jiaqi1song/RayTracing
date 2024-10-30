@@ -6,22 +6,19 @@
 
 ### CPU Renderer
 
-- [x] Basic setup (Scatter, Material, Texture, BVH and AABB, Monte Carlo Sampling, Smoke, Quad and Sphere, Light sources)
-- [x] Benchmark code and test case
+- [x] Basic setup in CPU
+- [x] Benchmark test case
 - [x] Shared image data address
 - [x] OpenMP acceleration support
+- [ ] Further optimization and acceleration on CPU
 - [ ] Custum scene design
-- [ ] Further optimization and acceleration
 - [ ] Display and animation
-- [ ] Advanced techniques (bidirectional, Metropolis etc.)
 
 ### CUDA Renderer
 
-- [ ] Basic setup (Scatter, Material, Texture, BVH and AABB, Monte Carlo Sampling, Smoke, Quad and Sphere, Light sources)
-- [ ] Benchmark code and test case
-- [ ] Further optimization and acceleration
-- [ ] Display and animation
-- [ ] Advanced techniques (bidirectional, Metropolis etc.)
+- [ ] Basic setup in CUDA 
+- [ ] Benchmark test case
+- [ ] Further optimization and acceleration on GPU
 
 ## Reference output image
 
