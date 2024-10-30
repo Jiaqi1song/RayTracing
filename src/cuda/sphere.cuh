@@ -1,14 +1,14 @@
 #ifndef SPHERE_H
 #define SPHERE_H
 
-#include "hittable.h"
-#include "onb.h"
+#include "hittable.cuh"
+#include "onb.cuh"
 
 
 class sphere : public hittable {
   public:
     // Stationary Sphere
-    sphere(const point3& static_center, double radius, shared_ptr<material> mat)
+    __device__ sphere(const point3& static_center, float radius, shared_ptr<material> mat)
       : center(static_center, vec3(0,0,0)), radius(std::fmax(0,radius)), mat(mat)
     {
         auto rvec = vec3(radius, radius, radius);
@@ -16,7 +16,7 @@ class sphere : public hittable {
     }
 
     // Moving Sphere
-    sphere(const point3& center1, const point3& center2, double radius,
+    __device__ sphere(const point3& center1, const point3& center2, float radius,
            shared_ptr<material> mat)
       : center(center1, center2 - center1), radius(std::fmax(0,radius)), mat(mat)
     {
@@ -26,7 +26,7 @@ class sphere : public hittable {
         bbox = aabb(box1, box2);
     }
 
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         point3 current_center = center.at(r.time());
         vec3 oc = current_center - r.origin();
         auto a = r.direction().length_squared();
@@ -57,9 +57,9 @@ class sphere : public hittable {
         return true;
     }
 
-    aabb bounding_box() const override { return bbox; }
+    __device__ aabb bounding_box() const override { return bbox; }
 
-    double pdf_value(const point3& origin, const vec3& direction) const override {
+    __device__ float pdf_value(const point3& origin, const vec3& direction) const override {
         // This method only works for stationary spheres.
 
         hit_record rec;
@@ -73,7 +73,7 @@ class sphere : public hittable {
         return  1 / solid_angle;
     }
 
-    vec3 random(const point3& origin) const override {
+    __device__ vec3 random(const point3& origin) const override {
         vec3 direction = center.at(0) - origin;
         auto distance_squared = direction.length_squared();
         onb uvw(direction);
@@ -82,11 +82,11 @@ class sphere : public hittable {
 
   private:
     ray center;
-    double radius;
+    float radius;
     shared_ptr<material> mat;
     aabb bbox;
 
-    static void get_sphere_uv(const point3& p, double& u, double& v) {
+    __device__ static void get_sphere_uv(const point3& p, float& u, float& v) {
         // p: a given point on the sphere of radius one, centered at the origin.
         // u: returned value [0,1] of angle around the Y axis from X=-1.
         // v: returned value [0,1] of angle from Y=-1 to Y=+1.
@@ -101,9 +101,9 @@ class sphere : public hittable {
         v = theta / pi;
     }
 
-    static vec3 random_to_sphere(double radius, double distance_squared) {
-        auto r1 = random_double();
-        auto r2 = random_double();
+    __device__ static vec3 random_to_sphere(float radius, float distance_squared) {
+        auto r1 = random_float();
+        auto r2 = random_float();
         auto z = 1 + r2*(std::sqrt(1-radius*radius/distance_squared) - 1);
 
         auto phi = 2*pi*r1;

@@ -3,7 +3,7 @@
 
 class perlin {
   public:
-    perlin() {
+    __device__ perlin() {
         for (int i = 0; i < point_count; i++) {
             randvec[i] = unit_vector(vec3::random(-1,1));
         }
@@ -13,7 +13,7 @@ class perlin {
         perlin_generate_perm(perm_z);
     }
 
-    double noise(const point3& p) const {
+    __device__ float noise(const point3& p) const {
         auto u = p.x() - std::floor(p.x());
         auto v = p.y() - std::floor(p.y());
         auto w = p.z() - std::floor(p.z());
@@ -35,7 +35,7 @@ class perlin {
         return perlin_interp(c, u, v, w);
     }
 
-    double turb(const point3& p, int depth) const {
+    __device__ float turb(const point3& p, int depth) const {
         auto accum = 0.0;
         auto temp_p = p;
         auto weight = 1.0;
@@ -56,14 +56,14 @@ class perlin {
     int perm_y[point_count];
     int perm_z[point_count];
 
-    static void perlin_generate_perm(int* p) {
+    __device__ static void perlin_generate_perm(int* p) {
         for (int i = 0; i < point_count; i++)
             p[i] = i;
 
         permute(p, point_count);
     }
 
-    static void permute(int* p, int n) {
+    __device__ static void permute(int* p, int n) {
         for (int i = n-1; i > 0; i--) {
             int target = random_int(0, i);
             int tmp = p[i];
@@ -72,7 +72,7 @@ class perlin {
         }
     }
 
-    static double perlin_interp(const vec3 c[2][2][2], double u, double v, double w) {
+    __device__ static float perlin_interp(const vec3 c[2][2][2], float u, float v, float w) {
         auto uu = u*u*(3-2*u);
         auto vv = v*v*(3-2*v);
         auto ww = w*w*(3-2*w);

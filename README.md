@@ -6,7 +6,7 @@
 
 ### CPU Renderer
 
-- [x] Basic setup in CPU
+- [x] Basic setup on CPU
 - [x] Benchmark test case
 - [x] Shared image data address
 - [x] OpenMP acceleration support
@@ -16,7 +16,7 @@
 
 ### CUDA Renderer
 
-- [ ] Basic setup in CUDA 
+- [ ] Basic setup on CUDA 
 - [ ] Benchmark test case
 - [ ] Further optimization and acceleration on GPU
 

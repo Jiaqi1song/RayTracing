@@ -3,37 +3,37 @@
 
 class interval {
   public:
-    double min, max;
+    float min, max;
 
-    interval() : min(+infinity), max(-infinity) {} // Default interval is empty
+    __device__ interval() : min(+infinity), max(-infinity) {} // Default interval is empty
 
-    interval(double min, double max) : min(min), max(max) {}
+    __device__ interval(float min, float max) : min(min), max(max) {}
 
-    interval(const interval& a, const interval& b) {
+    __device__ interval(const interval& a, const interval& b) {
         // Create the interval tightly enclosing the two input intervals.
         min = a.min <= b.min ? a.min : b.min;
         max = a.max >= b.max ? a.max : b.max;
     }
 
-    double size() const {
+    __device__ float size() const {
         return max - min;
     }
 
-    bool contains(double x) const {
+    __device__ bool contains(float x) const {
         return min <= x && x <= max;
     }
 
-    bool surrounds(double x) const {
+    __device__ bool surrounds(float x) const {
         return min < x && x < max;
     }
 
-    double clamp(double x) const {
+    __device__ float clamp(float x) const {
         if (x < min) return min;
         if (x > max) return max;
         return x;
     }
 
-    interval expand(double delta) const {
+    __device__ interval expand(float delta) const {
         auto padding = delta/2;
         return interval(min - padding, max + padding);
     }
@@ -41,14 +41,14 @@ class interval {
     static const interval empty, universe;
 };
 
-const interval interval::empty    = interval(+infinity, -infinity);
-const interval interval::universe = interval(-infinity, +infinity);
+__device__ const interval interval::empty    = interval(+infinity, -infinity);
+__device__ const interval interval::universe = interval(-infinity, +infinity);
 
-interval operator+(const interval& ival, double displacement) {
+__device__ interval operator+(const interval& ival, float displacement) {
     return interval(ival.min + displacement, ival.max + displacement);
 }
 
-interval operator+(double displacement, const interval& ival) {
+__device__ interval operator+(float displacement, const interval& ival) {
     return ival + displacement;
 }
 

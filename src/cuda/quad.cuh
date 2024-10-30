@@ -1,13 +1,13 @@
 #ifndef QUAD_H
 #define QUAD_H
 
-#include "hittable.h"
-#include "hittable_list.h"
+#include "hittable.cuh"
+#include "hittable_list.cuh"
 
 
 class quad : public hittable {
   public:
-    quad(const point3& Q, const vec3& u, const vec3& v, shared_ptr<material> mat)
+    __device__ quad(const point3& Q, const vec3& u, const vec3& v, shared_ptr<material> mat)
       : Q(Q), u(u), v(v), mat(mat)
     {
         auto n = cross(u, v);
@@ -20,16 +20,16 @@ class quad : public hittable {
         set_bounding_box();
     }
 
-    virtual void set_bounding_box() {
+    __device__ virtual void set_bounding_box() {
         // Compute the bounding box of all four vertices.
         auto bbox_diagonal1 = aabb(Q, Q + u + v);
         auto bbox_diagonal2 = aabb(Q + u, Q + v);
         bbox = aabb(bbox_diagonal1, bbox_diagonal2);
     }
 
-    aabb bounding_box() const override { return bbox; }
+    __device__ aabb bounding_box() const override { return bbox; }
 
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         auto denom = dot(normal, r.direction());
 
         // No hit if the ray is parallel to the plane.
@@ -59,7 +59,7 @@ class quad : public hittable {
         return true;
     }
 
-    virtual bool is_interior(double a, double b, hit_record& rec) const {
+    __device__ virtual bool is_interior(float a, float b, hit_record& rec) const {
         interval unit_interval = interval(0, 1);
         // Given the hit point in plane coordinates, return false if it is outside the
         // primitive, otherwise set the hit record UV coordinates and return true.
@@ -72,7 +72,7 @@ class quad : public hittable {
         return true;
     }
 
-    double pdf_value(const point3& origin, const vec3& direction) const override {
+    __device__ float pdf_value(const point3& origin, const vec3& direction) const override {
         hit_record rec;
         if (!this->hit(ray(origin, direction), interval(0.001, infinity), rec))
             return 0;
@@ -83,8 +83,8 @@ class quad : public hittable {
         return distance_squared / (cosine * area);
     }
 
-    vec3 random(const point3& origin) const override {
-        auto p = Q + (random_double() * u) + (random_double() * v);
+    __device__ vec3 random(const point3& origin) const override {
+        auto p = Q + (random_float() * u) + (random_float() * v);
         return p - origin;
     }
 
@@ -95,12 +95,12 @@ class quad : public hittable {
     shared_ptr<material> mat;
     aabb bbox;
     vec3 normal;
-    double D;
-    double area;
+    float D;
+    float area;
 };
 
 
-inline shared_ptr<hittable_list> box(const point3& a, const point3& b, shared_ptr<material> mat)
+__device__ inline shared_ptr<hittable_list> box(const point3& a, const point3& b, shared_ptr<material> mat)
 {
     // Returns the 3D box (six sides) that contains the two opposite vertices a & b.
 

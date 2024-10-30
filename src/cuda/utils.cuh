@@ -10,10 +10,10 @@
 
 // Common Headers
 
-#include "color.h"
-#include "interval.h"
-#include "ray.h"
-#include "vec3.h"
+#include "color.cuh"
+#include "interval.cuh"
+#include "ray.cuh"
+#include "vec3.cuh"
 
 // C++ Std Usings
 

@@ -1,14 +1,14 @@
 #ifndef COLOR_H
 #define COLOR_H
 
-#include "interval.h"
-#include "vec3.h"
+#include "interval.cuh"
+#include "vec3.cuh"
 #include <stdlib.h>
 
 using color = vec3;
 
 
-inline double linear_to_gamma(double linear_component)
+__device__ inline float linear_to_gamma(float linear_component)
 {
     if (linear_component > 0)
         return std::sqrt(linear_component);
@@ -17,7 +17,7 @@ inline double linear_to_gamma(double linear_component)
 }
 
 
-void write_color(int* pixelData, const color& pixel_color) {
+__device__ void write_color(int* pixelData, const color& pixel_color) {
     auto r = pixel_color.x();
     auto g = pixel_color.y();
     auto b = pixel_color.z();
@@ -46,13 +46,13 @@ void write_color(int* pixelData, const color& pixel_color) {
 
 struct Image {
 
-    Image(int w, int h) {
+    __device__ Image(int w, int h) {
         width = w;
         height = h;
         data = new int[3 * width * height];
     }
 
-    void clear(int r, int g, int b) {
+    __device__ void clear(int r, int g, int b) {
 
         int numPixels = width * height;
         int* ptr = data;
@@ -69,7 +69,7 @@ struct Image {
     int* data;
 };
 
-void writePPMImage(const Image* image, const char *filename)
+__host__ void writePPMImage(const Image* image, const char *filename)
 {
     FILE *fp = fopen(filename, "wb");
 

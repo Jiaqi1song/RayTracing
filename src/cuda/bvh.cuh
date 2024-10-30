@@ -1,9 +1,9 @@
 #ifndef BVH_H
 #define BVH_H
 
-#include "aabb.h"
-#include "hittable.h"
-#include "hittable_list.h"
+#include "aabb.cuh"
+#include "hittable.cuh"
+#include "hittable_list.cuh"
 
 #include <algorithm>
 

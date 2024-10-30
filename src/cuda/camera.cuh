@@ -1,15 +1,14 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "hittable.h"
-#include "pdf.h"
-#include "material.h"
-#include <omp.h>
+#include "hittable.cuh"
+#include "pdf.cuh"
+#include "material.cuh"
 #include <string>
 
 class camera {
   public:
-    double aspect_ratio      = 1.0;  // Ratio of image width over height
+    float aspect_ratio      = 1.0;  // Ratio of image width over height
     int    image_width       = 100;  // Rendered image width in pixel count
     int    samples_per_pixel = 10;   // Count of random samples for each pixel
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
@@ -20,15 +19,15 @@ class camera {
     char filepath[1024];
     std::string filename = "image.ppm";
     
-    double vfov     = 90;              // Vertical view angle (field of view)
+    float vfov     = 90;              // Vertical view angle (field of view)
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
     point3 lookat   = point3(0,0,-1);  // Point camera is looking at
     vec3   vup      = vec3(0,1,0);     // Camera-relative "up" direction
 
-    double defocus_angle = 0;  // Variation angle of rays through each pixel
-    double focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
+    float defocus_angle = 0;  // Variation angle of rays through each pixel
+    float focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
 
-    void render(const hittable& world, const hittable& lights) {
+    __device__ void render(const hittable& world, const hittable& lights) {
         initialize();
 
         if (use_openmp) {
@@ -61,9 +60,9 @@ class camera {
 
   private:
     int    image_height;         // Rendered image height
-    double pixel_samples_scale;  // Color scale factor for a sum of pixel samples
+    float pixel_samples_scale;  // Color scale factor for a sum of pixel samples
     int    sqrt_spp;             // Square root of number of samples per pixel
-    double recip_sqrt_spp;       // 1 / sqrt_spp
+    float recip_sqrt_spp;       // 1 / sqrt_spp
     point3 center;               // Camera center
     point3 pixel00_loc;          // Location of pixel 0, 0
     vec3   pixel_delta_u;        // Offset to pixel to the right
@@ -72,7 +71,7 @@ class camera {
     vec3   defocus_disk_u;       // Defocus disk horizontal radius
     vec3   defocus_disk_v;       // Defocus disk vertical radius
 
-    void initialize() {
+    __device__ void initialize() {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
 
@@ -94,7 +93,7 @@ class camera {
         auto theta = degrees_to_radians(vfov);
         auto h = std::tan(theta/2);
         auto viewport_height = 2 * h * focus_dist;
-        auto viewport_width = viewport_height * (double(image_width)/image_height);
+        auto viewport_width = viewport_height * (float(image_width)/image_height);
 
         // Calculate the u,v,w unit basis vectors for the camera coordinate frame.
         w = unit_vector(lookfrom - lookat);
@@ -119,7 +118,7 @@ class camera {
         defocus_disk_v = v * defocus_radius;
     }
 
-    ray get_ray(int i, int j, int s_i, int s_j) const {
+    __device__ ray get_ray(int i, int j, int s_i, int s_j) const {
         // Construct a camera ray originating from the defocus disk and directed at a randomly
         // sampled point around the pixel location i, j for stratified sample square s_i, s_j.
 
@@ -130,38 +129,38 @@ class camera {
 
         auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
         auto ray_direction = pixel_sample - ray_origin;
-        auto ray_time = random_double();
+        auto ray_time = random_float();
 
         return ray(ray_origin, ray_direction, ray_time);
     }
 
-    vec3 sample_square_stratified(int s_i, int s_j) const {
+    __device__ vec3 sample_square_stratified(int s_i, int s_j) const {
         // Returns the vector to a random point in the square sub-pixel specified by grid
         // indices s_i and s_j, for an idealized unit square pixel [-.5,-.5] to [+.5,+.5].
 
-        auto px = ((s_i + random_double()) * recip_sqrt_spp) - 0.5;
-        auto py = ((s_j + random_double()) * recip_sqrt_spp) - 0.5;
+        auto px = ((s_i + random_float()) * recip_sqrt_spp) - 0.5;
+        auto py = ((s_j + random_float()) * recip_sqrt_spp) - 0.5;
 
         return vec3(px, py, 0);
     }
 
-    vec3 sample_square() const {
+    __device__ vec3 sample_square() const {
         // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
-        return vec3(random_double() - 0.5, random_double() - 0.5, 0);
+        return vec3(random_float() - 0.5, random_float() - 0.5, 0);
     }
 
-    vec3 sample_disk(double radius) const {
+    __device__ vec3 sample_disk(float radius) const {
         // Returns a random point in the unit (radius 0.5) disk centered at the origin.
         return radius * random_in_unit_disk();
     }
 
-    point3 defocus_disk_sample() const {
+    __device__ point3 defocus_disk_sample() const {
         // Returns a random point in the camera defocus disk.
         auto p = random_in_unit_disk();
         return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
     }
 
-    color ray_color(const ray& r, int depth, const hittable& world, const hittable& lights)
+    __device__ color ray_color(const ray& r, int depth, const hittable& world, const hittable& lights)
     const {
         // If we've exceeded the ray bounce limit, no more light is gathered.
         if (depth <= 0)
@@ -189,7 +188,7 @@ class camera {
         ray scattered = ray(rec.p, p.generate(), r.time());
         auto pdf_value = p.value(scattered.direction());
 
-        double scattering_pdf = rec.mat->scattering_pdf(r, rec, scattered);
+        float scattering_pdf = rec.mat->scattering_pdf(r, rec, scattered);
 
         color sample_color = ray_color(scattered, depth-1, world, lights);
         color color_from_scatter =

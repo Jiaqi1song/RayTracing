@@ -1,23 +1,23 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include "utils.h"
+#include "utils.cuh"
 
-#include "bvh.h"
-#include "camera.h"
-#include "constant_medium.h"
-#include "hittable_list.h"
-#include "material.h"
-#include "quad.h"
-#include "sphere.h"
-#include "texture.h"
+#include "bvh.cuh"
+#include "camera.cuh"
+#include "constant_medium.cuh"
+#include "hittable_list.cuh"
+#include "material.cuh"
+#include "quad.cuh"
+#include "sphere.cuh"
+#include "texture.cuh"
 
 #include <iomanip> 
 #include <iostream>
 #include <chrono>
 #include <string>
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void first_scene(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
@@ -25,8 +25,8 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 
     for (int a = -11; a < 11; a++) {
         for (int b = -11; b < 11; b++) {
-            auto choose_mat = random_double();
-            point3 center(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
+            auto choose_mat = random_float();
+            point3 center(a + 0.9*random_float(), 0.2, b + 0.9*random_float());
 
             if ((center - point3(4, 0.2, 0)).length() > 0.9) {
                 shared_ptr<material> sphere_material;
@@ -39,7 +39,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
                 } else if (choose_mat < 0.95) {
                     // metal
                     auto albedo = color::random(0.5, 1);
-                    auto fuzz = random_double(0, 0.5);
+                    auto fuzz = random_float(0, 0.5);
                     sphere_material = make_shared<metal>(albedo, fuzz);
                     world.add(make_shared<sphere>(center, 0.2, sphere_material));
                 } else {
@@ -90,7 +90,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 }
 
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void cornell_box(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -146,7 +146,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.render(world, lights);
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void cornell_smoke(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -201,7 +201,7 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     renderer.render(world, lights);
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void final_scene(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -213,7 +213,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
             auto z0 = -1000.0 + j*w;
             auto y0 = 0.0;
             auto x1 = x0 + w;
-            auto y1 = random_double(1,101);
+            auto y1 = random_float(1,101);
             auto z1 = z0 + w;
 
             boxes1.add(box(point3(x0,y0,z0), point3(x1,y1,z1), ground));
@@ -299,7 +299,7 @@ int main() {
 
     // Hyperparameters
     int image_width = 1000;               // Rendered image width in pixel count
-    double aspect_ratio = 1.0;            // Ratio of image width over height
+    float aspect_ratio = 1.0;            // Ratio of image width over height
     int samples_per_pixel = 100;          // Count of random samples for each pixel
     int max_depth = 50;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
@@ -312,7 +312,7 @@ int main() {
         default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
     }
     auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = endTime - startTime;
+    std::chrono::duration<float> duration = endTime - startTime;
 
     std::clog << "Overall Rendering Time: " << std::fixed << std::setprecision(4) << duration.count() << " seconds\n"; 
 }

@@ -1,24 +1,24 @@
 #ifndef CONSTANT_MEDIUM_H
 #define CONSTANT_MEDIUM_H
 
-#include "hittable.h"
-#include "material.h"
-#include "texture.h"
+#include "hittable.cuh"
+#include "material.cuh"
+#include "texture.cuh"
 
 
 class constant_medium : public hittable {
   public:
-    constant_medium(shared_ptr<hittable> boundary, double density, shared_ptr<texture> tex)
+    __device__ constant_medium(shared_ptr<hittable> boundary, float density, shared_ptr<texture> tex)
       : boundary(boundary), neg_inv_density(-1/density),
         phase_function(make_shared<isotropic>(tex))
     {}
 
-    constant_medium(shared_ptr<hittable> boundary, double density, const color& albedo)
+    __device__ constant_medium(shared_ptr<hittable> boundary, float density, const color& albedo)
       : boundary(boundary), neg_inv_density(-1/density),
         phase_function(make_shared<isotropic>(albedo))
     {}
 
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         hit_record rec1, rec2;
 
         if (!boundary->hit(r, interval::universe, rec1))
@@ -38,7 +38,7 @@ class constant_medium : public hittable {
 
         auto ray_length = r.direction().length();
         auto distance_inside_boundary = (rec2.t - rec1.t) * ray_length;
-        auto hit_distance = neg_inv_density * std::log(random_double());
+        auto hit_distance = neg_inv_density * std::log(random_float());
 
         if (hit_distance > distance_inside_boundary)
             return false;
@@ -53,11 +53,11 @@ class constant_medium : public hittable {
         return true;
     }
 
-    aabb bounding_box() const override { return boundary->bounding_box(); }
+    __device__ aabb bounding_box() const override { return boundary->bounding_box(); }
 
   private:
     shared_ptr<hittable> boundary;
-    double neg_inv_density;
+    float neg_inv_density;
     shared_ptr<material> phase_function;
 };
 
