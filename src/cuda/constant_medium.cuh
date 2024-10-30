@@ -10,12 +10,12 @@ class constant_medium : public hittable {
   public:
     __device__ constant_medium(shared_ptr<hittable> boundary, float density, shared_ptr<texture> tex)
       : boundary(boundary), neg_inv_density(-1/density),
-        phase_function(make_shared<isotropic>(tex))
+        phase_function(new isotropic(tex))
     {}
 
     __device__ constant_medium(shared_ptr<hittable> boundary, float density, const color& albedo)
       : boundary(boundary), neg_inv_density(-1/density),
-        phase_function(make_shared<isotropic>(albedo))
+        phase_function(new isotropic(albedo))
     {}
 
     __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {

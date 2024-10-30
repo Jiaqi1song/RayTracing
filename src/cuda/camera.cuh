@@ -30,17 +30,8 @@ class camera {
     __device__ void render(const hittable& world, const hittable& lights) {
         initialize();
 
-        if (use_openmp) {
-            omp_set_num_threads(num_threads);
-            std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
-        } else {
-            std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
-        }
-        
-        #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
         for (int j = 0; j < image_height; j++) {
             for (int i = 0; i < image_width; i++) {
-                if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
                 color pixel_color(0,0,0);
                 for (int s_j = 0; s_j < sqrt_spp; s_j++) {
                     for (int s_i = 0; s_i < sqrt_spp; s_i++) {
@@ -54,7 +45,6 @@ class camera {
             }
         }
 
-        std::clog << "\rRendering Done. Writing image to " << filename.c_str() << ".         \n";
         writePPMImage(image, filepath);
     }
 
@@ -160,6 +150,7 @@ class camera {
         return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
     }
 
+    // TODO: change this function to iteraion version
     __device__ color ray_color(const ray& r, int depth, const hittable& world, const hittable& lights)
     const {
         // If we've exceeded the ray bounce limit, no more light is gathered.
@@ -182,7 +173,7 @@ class camera {
             return srec.attenuation * ray_color(srec.skip_pdf_ray, depth-1, world, lights);
         }
 
-        auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
+        auto light_ptr = new hittable_pdf(lights, rec.p);
         mixture_pdf p(light_ptr, srec.pdf_ptr);
 
         ray scattered = ray(rec.p, p.generate(), r.time());

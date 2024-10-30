@@ -114,12 +114,12 @@ __device__ inline shared_ptr<hittable_list> box(const point3& a, const point3& b
     auto dy = vec3(0, max.y() - min.y(), 0);
     auto dz = vec3(0, 0, max.z() - min.z());
 
-    sides->add(make_shared<quad>(point3(min.x(), min.y(), max.z()),  dx,  dy, mat)); // front
-    sides->add(make_shared<quad>(point3(max.x(), min.y(), max.z()), -dz,  dy, mat)); // right
-    sides->add(make_shared<quad>(point3(max.x(), min.y(), min.z()), -dx,  dy, mat)); // back
-    sides->add(make_shared<quad>(point3(min.x(), min.y(), min.z()),  dz,  dy, mat)); // left
-    sides->add(make_shared<quad>(point3(min.x(), max.y(), max.z()),  dx, -dz, mat)); // top
-    sides->add(make_shared<quad>(point3(min.x(), min.y(), min.z()),  dx,  dz, mat)); // bottom
+    sides->add(new quad(point3(min.x(), min.y(), max.z()),  dx,  dy, mat)); // front
+    sides->add(new quad(point3(max.x(), min.y(), max.z()), -dz,  dy, mat)); // right
+    sides->add(new quad(point3(max.x(), min.y(), min.z()), -dx,  dy, mat)); // back
+    sides->add(new quad(point3(min.x(), min.y(), min.z()),  dz,  dy, mat)); // left
+    sides->add(new quad(point3(min.x(), max.y(), max.z()),  dx, -dz, mat)); // top
+    sides->add(new quad(point3(min.x(), min.y(), min.z()),  dx,  dz, mat)); // bottom
 
     return sides;
 }

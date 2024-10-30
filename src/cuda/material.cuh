@@ -38,12 +38,12 @@ class material {
 
 class lambertian : public material {
   public:
-    __device__ lambertian(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
+    __device__ lambertian(const color& albedo) : tex(new solid_color(albedo)) {}
     __device__ lambertian(shared_ptr<texture> tex) : tex(tex) {}
 
     __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override {
         srec.attenuation = tex->value(rec.u, rec.v, rec.p);
-        srec.pdf_ptr = make_shared<cosine_pdf>(rec.normal);
+        srec.pdf_ptr = new cosine_pdf(rec.normal);
         srec.skip_pdf = false;
         return true;
     }
@@ -124,7 +124,7 @@ class dielectric : public material {
 class diffuse_light : public material {
   public:
     __device__ diffuse_light(shared_ptr<texture> tex) : tex(tex) {}
-    __device__ diffuse_light(const color& emit) : tex(make_shared<solid_color>(emit)) {}
+    __device__ diffuse_light(const color& emit) : tex(new solid_color(emit)) {}
 
     __device__ color emitted(const ray& r_in, const hit_record& rec, float u, float v, const point3& p)
     __device__ const override {
@@ -140,12 +140,12 @@ class diffuse_light : public material {
 
 class isotropic : public material {
   public:
-    __device__ isotropic(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
+    __device__ isotropic(const color& albedo) : tex(new solid_color(albedo)) {}
     __device__ isotropic(shared_ptr<texture> tex) : tex(tex) {}
 
     __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override {
         srec.attenuation = tex->value(rec.u, rec.v, rec.p);
-        srec.pdf_ptr = make_shared<sphere_pdf>();
+        srec.pdf_ptr = new sphere_pdf();
         srec.skip_pdf = false;
         return true;
     }

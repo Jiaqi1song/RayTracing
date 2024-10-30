@@ -10,6 +10,8 @@
 - [x] Benchmark test case
 - [x] Shared image data address
 - [x] OpenMP acceleration support
+- [ ] Use OpenMP and BVH to accelerate
+- [ ] Use SIMD to accelerate
 - [ ] Further optimization and acceleration on CPU
 - [ ] Custum scene design
 - [ ] Display and animation
@@ -18,6 +20,8 @@
 
 - [ ] Basic setup on CUDA 
 - [ ] Benchmark test case
+- [ ] Monte Carlo sampling on CUDA 
+- [ ] BVH acceleration on CUDA 
 - [ ] Further optimization and acceleration on GPU
 
 ## Reference output image

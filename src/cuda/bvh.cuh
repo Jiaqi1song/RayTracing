@@ -40,8 +40,8 @@ class bvh_node : public hittable {
             std::sort(std::begin(objects) + start, std::begin(objects) + end, comparator);
 
             auto mid = start + object_span/2;
-            left = make_shared<bvh_node>(objects, start, mid);
-            right = make_shared<bvh_node>(objects, mid, end);
+            left = new bvh_node(objects, start, mid);
+            right = new bvh_node(objects, mid, end);
         }
     }
 

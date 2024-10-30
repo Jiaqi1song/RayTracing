@@ -15,12 +15,6 @@
 #include "ray.cuh"
 #include "vec3.cuh"
 
-// C++ Std Usings
-
-using std::make_shared;
-using std::shared_ptr;
-
-
 // Constants
 
 __device__ const float infinity = std::numeric_limits<float>::infinity();
