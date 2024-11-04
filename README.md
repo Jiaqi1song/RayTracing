@@ -2,6 +2,8 @@
 
 #### Jiaqi Song (<jiaqison@andrew.cmu.edu>), Xinping Luo (<xinpingl@andrew.cmu.edu>)
 
+We use the CPU start code from [Ray Tracing in One Weekend series](https://raytracing.github.io/). We plan to use OpenMP and CUDA to accelerate the rendering process.
+
 ## TODO List
 
 ### CPU Renderer
@@ -22,6 +24,7 @@
 - [ ] Monte Carlo sampling on CUDA 
 - [ ] BVH acceleration on CUDA 
 - [ ] Further optimization and acceleration on GPU
+- [ ] Display and animation
 
 ## Reference output image
 
