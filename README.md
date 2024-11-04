@@ -11,7 +11,6 @@
 - [x] Shared image data address
 - [x] OpenMP acceleration support
 - [ ] Use OpenMP and BVH to accelerate
-- [ ] Use SIMD to accelerate
 - [ ] Further optimization and acceleration on CPU
 - [ ] Custum scene design
 - [ ] Display and animation
