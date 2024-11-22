@@ -11,5 +11,6 @@ cmake --build build --config release
 
 # Combine the ppm files into one gif
 ffmpeg -framerate 7 -i ./images/animation/image%d.ppm -y ./images/animation.gif
+rm ./images/animation/*.ppm
 
 # CUDA ray tracer
