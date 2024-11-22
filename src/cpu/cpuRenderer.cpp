@@ -14,7 +14,7 @@
 #include <chrono>
 #include <string>
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
+void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section) {
     hittable_list world;
 
     auto checker = make_shared<checker_texture>(0.32, color(.8, .1, .1), color(.9, .9, .9));
@@ -75,6 +75,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
+    renderer.critical_section  = critical_section;
 
     renderer.vfov     = 20;
     renderer.lookfrom = point3(13,2,3);
@@ -93,7 +94,7 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 }
 
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
+void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -141,6 +142,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
+    renderer.critical_section  = critical_section;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(278, 278, -800);
@@ -156,7 +158,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     }
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
+void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -203,6 +205,7 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
+    renderer.critical_section  = critical_section;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(278, 278, -800);
@@ -218,7 +221,7 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     }
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
+void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -297,6 +300,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
+    renderer.critical_section  = critical_section;
 
     renderer.vfov     = 40;
     renderer.lookfrom = point3(478, 278, -600);
@@ -322,20 +326,21 @@ int main() {
     bool use_bvh = true;
     int num_threads = 8;
     bool animation = true;
+    bool critical_section = false;
 
     // Hyperparameters
-    int image_width = 600;               // Rendered image width in pixel count
-    double aspect_ratio = 16.0 / 9.0;    // Ratio of image width over height
-    int samples_per_pixel = 10;          // Count of random samples for each pixel
+    int image_width = 600;                // Rendered image width in pixel count
+    double aspect_ratio = 16.0 / 9.0;     // Ratio of image width over height
+    int samples_per_pixel = 200;          // Count of random samples for each pixel
     int max_depth = 20;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
 
     auto startTime = std::chrono::high_resolution_clock::now();
     switch (scene) {
-        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
-        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
-        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);   break;
-        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
+        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section);     break;
+        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section);     break;
+        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section);   break;
+        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section);     break;
     }
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = endTime - startTime;
