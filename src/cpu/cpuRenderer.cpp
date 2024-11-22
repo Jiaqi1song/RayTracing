@@ -324,15 +324,15 @@ int main() {
     // Acceleration technique selection
     bool use_openmp = true;
     bool use_bvh = true;
-    int num_threads = 8;
+    int num_threads = 10;
     bool animation = true;
     bool critical_section = false;
 
     // Hyperparameters
-    int image_width = 600;                // Rendered image width in pixel count
+    int image_width = 1000;               // Rendered image width in pixel count
     double aspect_ratio = 16.0 / 9.0;     // Ratio of image width over height
-    int samples_per_pixel = 200;          // Count of random samples for each pixel
-    int max_depth = 20;                   // Maximum number of ray bounces into scene
+    int samples_per_pixel = 500;          // Count of random samples for each pixel
+    int max_depth = 50;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
 
     auto startTime = std::chrono::high_resolution_clock::now();
