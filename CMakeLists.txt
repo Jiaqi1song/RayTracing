@@ -68,5 +68,6 @@ endif()
 # Executables
 add_executable(cpuRayTracer ${CPURENDERER})
 
+# OpenMP
 find_package(OpenMP)
 target_link_libraries(cpuRayTracer PUBLIC OpenMP::OpenMP_CXX)

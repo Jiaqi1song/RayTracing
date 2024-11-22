@@ -11,11 +11,8 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 - [x] Basic setup on CPU
 - [x] Benchmark test case
 - [x] Shared image data address
-- [x] OpenMP acceleration support
-- [ ] Use OpenMP and BVH to accelerate
-- [ ] Further optimization and acceleration on CPU
-- [ ] Custum scene design
-- [ ] Display and animation
+- [x] Use OpenMP and BVH to accelerate
+- [x] Animation
 
 ### CUDA Renderer
 
@@ -23,10 +20,13 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 - [ ] Benchmark test case
 - [ ] Monte Carlo sampling on CUDA 
 - [ ] BVH acceleration on CUDA 
-- [ ] Further optimization and acceleration on GPU
-- [ ] Display and animation
+- [ ] Animation
+
 
 ## Reference output image
+
+### Animation
+![image](./images/animation.gif)
 
 ### Cornell Box
 ![image](./images/cornell_box.png)
@@ -39,3 +39,4 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 
 ### Final scene
 ![image](./images/final_scene.png)
+

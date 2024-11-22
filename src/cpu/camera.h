@@ -1,11 +1,19 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#include "utils.h"
 #include "hittable.h"
 #include "pdf.h"
 #include "material.h"
 #include <omp.h>
 #include <string>
+
+enum CameraMovement {
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT
+};
 
 class camera {
   public:
@@ -28,8 +36,66 @@ class camera {
     double defocus_angle = 0;  // Variation angle of rays through each pixel
     double focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
 
+    int animation_sample = int(2 * pi / delta_phi);
+
+    void render_animation(const hittable& world, const hittable& lights) {
+        
+        vec3 direction = lookfrom - lookat;
+        double theta = std::acos(direction.y() / direction.length());
+        double phi = std::atan2(direction.x(), direction.z());
+        double zoom_scale = 1.005;
+
+        std::clog << "\rTotal frames: " << animation_sample << ": \n";
+        for (int frame = 0; frame < animation_sample; frame++) {
+            
+            rotate(theta, phi);
+            zoom(zoom_scale);
+            initialize();
+
+            // Output file path
+            sprintf(filepath, "./images/animation/image%d.ppm", frame);
+
+            std::clog << "\rStart Rendering Frame " << frame << ": \n";
+            if (use_openmp) {
+                omp_set_num_threads(num_threads);
+                std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
+            } else {
+                std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
+            }
+            
+            #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
+            for (int j = 0; j < image_height; j++) {
+                for (int i = 0; i < image_width; i++) {
+                    if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                    color pixel_color(0,0,0);
+                    for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                        for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                            ray r = get_ray(i, j, s_i, s_j);
+                            pixel_color += ray_color(r, max_depth, world, lights);
+                        }
+                    }
+
+                    int* imgPtr = &image->data[3 * (j * image_width + i)];
+                    write_color(imgPtr, pixel_samples_scale * pixel_color);
+                }
+            }
+
+            std::clog << "\rRendering Frame " << frame << " Done.       \n";
+            writePPMImage(image, filepath);
+
+            phi += delta_phi; 
+            if (phi >= 2 * pi) phi -= 2 * pi;
+            theta -= 0.01;
+            if (theta <= 0) theta = 0;
+        }
+    }
+
+
     void render(const hittable& world, const hittable& lights) {
         initialize();
+
+        // Output file path
+        sprintf(filepath, "./images/%s", filename.c_str());
 
         if (use_openmp) {
             omp_set_num_threads(num_threads);
@@ -80,9 +146,6 @@ class camera {
         if (image) delete image;
         image = new Image(image_width, image_height);
         image->clear(0,0,0);
-
-        // Output file path
-        sprintf(filepath, "./images/%s", filename.c_str());
 
         sqrt_spp = int(std::sqrt(samples_per_pixel));
         pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
@@ -197,6 +260,40 @@ class camera {
 
         return color_from_emission + color_from_scatter;
     }
+
+    void rotate(double theta, double phi) {
+        double radialDistance = (lookfrom - lookat).length();
+        lookfrom = vec3(
+            radialDistance * std::sin(theta) * std::sin(phi),
+            radialDistance * std::cos(theta),
+            radialDistance * std::sin(theta) * std::cos(phi)
+        ) + lookat;
+    }
+
+    void zoom(double zoom_scale) {
+        vec3 direction = lookfrom - lookat;
+        lookfrom = direction * zoom_scale + lookat;
+    }
+
+    void translate(CameraMovement direction, double step_scale) {
+        if (direction == FORWARD) {
+            lookfrom += w * step_scale;
+            lookat += w * step_scale;;
+        }
+        if (direction == BACKWARD) {
+            lookfrom += w * -step_scale;
+            lookat += w * -step_scale;
+        }
+        if (direction == LEFT) {
+            lookfrom += u * -step_scale;
+            lookat += u * -step_scale;
+        }
+        if (direction == RIGHT) {
+            lookfrom += u * step_scale;
+            lookat += u * step_scale;
+        }
+    }
+
 };
 
 

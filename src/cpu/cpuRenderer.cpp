@@ -14,10 +14,10 @@
 #include <chrono>
 #include <string>
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
     hittable_list world;
 
-    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
+    auto checker = make_shared<checker_texture>(0.32, color(.8, .1, .1), color(.9, .9, .9));
     world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
 
     for (int a = -11; a < 11; a++) {
@@ -57,7 +57,8 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
-    world = hittable_list(make_shared<bvh_node>(world));
+    // If use BVH to accelrate the rendering process
+    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
 
     // Light Sources
     auto empty_material = shared_ptr<material>();
@@ -83,11 +84,16 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.defocus_angle = 0.6;
     renderer.focus_dist    = 10.0;
 
-    renderer.render(world, lights);
+    if (animation) {
+        renderer.render_animation(world, lights);
+    } else {
+        renderer.render(world, lights);
+    }
+    
 }
 
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -115,6 +121,9 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     auto glass = make_shared<dielectric>(1.5);
     world.add(make_shared<sphere>(point3(190,90,190), 90, glass));
 
+    // If use BVH to accelrate the rendering process
+    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
+
     // Light Sources
     auto empty_material = shared_ptr<material>();
     hittable_list lights;
@@ -140,10 +149,14 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
 
     renderer.defocus_angle = 0;
 
-    renderer.render(world, lights);
+    if (animation) {
+        renderer.render_animation(world, lights);
+    } else {
+        renderer.render(world, lights);
+    }
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -172,6 +185,9 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
     world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)));
     world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
 
+    // If use BVH to accelrate the rendering process
+    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
+
     // Light Sources
     auto empty_material = shared_ptr<material>();
     hittable_list lights;
@@ -195,10 +211,14 @@ void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, 
 
     renderer.defocus_angle = 0;
 
-    renderer.render(world, lights);
+    if (animation) {
+        renderer.render_animation(world, lights);
+    } else {
+        renderer.render(world, lights);
+    }
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
+void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -259,6 +279,9 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
         )
     );
 
+    // If use BVH to accelrate the rendering process
+    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
+
     // Light Sources
     auto empty_material = shared_ptr<material>();
     hittable_list lights;
@@ -282,31 +305,37 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 
     renderer.defocus_angle = 0;
 
-    renderer.render(world, lights);
+    if (animation) {
+        renderer.render_animation(world, lights);
+    } else {
+        renderer.render(world, lights);
+    }
 }
 
 
 int main() {
     // Scene selection
-    int scene = 2;         
+    int scene = 1;         
 
     // Acceleration technique selection
     bool use_openmp = true;
-    int num_threads = 16;
+    bool use_bvh = true;
+    int num_threads = 8;
+    bool animation = true;
 
     // Hyperparameters
-    int image_width = 1000;               // Rendered image width in pixel count
-    double aspect_ratio = 1.0;            // Ratio of image width over height
-    int samples_per_pixel = 100;          // Count of random samples for each pixel
-    int max_depth = 50;                   // Maximum number of ray bounces into scene
+    int image_width = 600;               // Rendered image width in pixel count
+    double aspect_ratio = 16.0 / 9.0;    // Ratio of image width over height
+    int samples_per_pixel = 10;          // Count of random samples for each pixel
+    int max_depth = 20;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
 
     auto startTime = std::chrono::high_resolution_clock::now();
     switch (scene) {
-        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
-        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
-        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);   break;
-        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
+        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
+        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
+        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);   break;
+        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation);     break;
     }
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = endTime - startTime;

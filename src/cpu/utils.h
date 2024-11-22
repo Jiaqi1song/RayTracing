@@ -19,6 +19,10 @@ using std::shared_ptr;
 const double infinity = std::numeric_limits<double>::infinity();
 const double pi = 3.1415926535897932385;
 
+const double delta_phi = 0.1;
+const double phi_init = 0;
+const double zoom_scale = 0.5;
+const double step_scale = 0.5;
 
 // Utility Functions
 
@@ -41,6 +45,9 @@ inline int random_int(int min, int max) {
     return int(random_double(min, max+1));
 }
 
+inline double clamp(const double& n, const double& lower, const double& upper) {
+  return std::max(lower, std::min(n, upper));
+}
 
 // Common Headers
 
