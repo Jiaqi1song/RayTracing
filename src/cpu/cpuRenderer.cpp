@@ -329,7 +329,7 @@ int main() {
     bool critical_section = false;
 
     // Hyperparameters
-    int image_width = 1000;               // Rendered image width in pixel count
+    int image_width = 800;               // Rendered image width in pixel count
     double aspect_ratio = 16.0 / 9.0;     // Ratio of image width over height
     int samples_per_pixel = 500;          // Count of random samples for each pixel
     int max_depth = 50;                   // Maximum number of ray bounces into scene
