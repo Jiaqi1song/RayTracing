@@ -25,8 +25,14 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 
 ## Reference output image
 
-### Animation (rotate + zoom)
-![image](./images/animation.gif)
+### First Scene Animation (rotate + zoom)
+![image](./images/animation1.gif)
+
+### First Scene Animation (translate)
+![image](./images/animation2.gif)
+
+### First Scene Animation (bounce sphere)
+![image](./images/animation3.gif)
 
 ### Cornell Box
 ![image](./images/cornell_box.png)

@@ -13,7 +13,9 @@ enum CameraMovement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    UP,
+    DOWN
 };
 
 class camera {
@@ -39,82 +41,165 @@ class camera {
     double focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
 
     int animation_sample = int(2 * pi / delta_phi);
+    int animation_method = 0;
+    bool use_bvh = true;
 
     void render_animation(const hittable& world, const hittable& lights) {
         
-        vec3 direction = lookfrom - lookat;
-        double theta = std::acos(direction.y() / direction.length());
-        double phi = std::atan2(direction.x(), direction.z());
-        double zoom_scale = 1.005;
+        if (animation_method = 0) {
+            vec3 direction = lookfrom - lookat;
+            double theta = std::acos(direction.y() / direction.length());
+            double phi = std::atan2(direction.x(), direction.z());
+            double zoom_scale = 1.005;
 
-        std::clog << "\rTotal frames: " << animation_sample << ": \n";
-        for (int frame = 0; frame < animation_sample; frame++) {
-            
-            rotate(theta, phi);
-            zoom(zoom_scale);
-            initialize();
+            std::clog << "\rTotal frames: " << animation_sample << ": \n";
+            for (int frame = 0; frame < animation_sample; frame++) {
+                
+                rotate(theta, phi);
+                zoom(zoom_scale);
+                initialize();
 
-            // Output file path
-            sprintf(filepath, "./images/animation/image%d.ppm", frame);
+                // Output file path
+                sprintf(filepath, "./images/animation/image%d.ppm", frame);
 
-            std::clog << "\rStart Rendering Frame " << frame << ": \n";
-            if (use_openmp) {
-                omp_set_num_threads(num_threads);
-                std::cout << "Max number of threads: " << omp_get_max_threads() << std::endl;
-                std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
-            } else {
-                std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
-            }
-            
-            if (critical_section) {
-                for (int j = 0; j < image_height; j++) {
-                    for (int i = 0; i < image_width; i++) {
-                        std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
-                        
-                        double r = 0.0, g = 0.0, b = 0.0;
-                        #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic) reduction(+: r, g, b)
-                        for (int s_j = 0; s_j < sqrt_spp; s_j++) {
-                            for (int s_i = 0; s_i < sqrt_spp; s_i++) {
-                                ray r1 = get_ray(i, j, s_i, s_j);
-                                color sample_color = ray_color(r1, max_depth, world, lights);
-                                r += sample_color.x();  
-                                g += sample_color.y(); 
-                                b += sample_color.z(); 
+                std::clog << "\rStart Rendering Frame " << frame << ": \n";
+                if (use_openmp) {
+                    omp_set_num_threads(num_threads);
+                    std::cout << "Max number of threads: " << omp_get_max_threads() << std::endl;
+                    std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
+                } else {
+                    std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
+                }
+                
+                if (critical_section) {
+                    for (int j = 0; j < image_height; j++) {
+                        for (int i = 0; i < image_width; i++) {
+                            std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                            
+                            double r = 0.0, g = 0.0, b = 0.0;
+                            #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic) reduction(+: r, g, b)
+                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                                    ray r1 = get_ray(i, j, s_i, s_j);
+                                    color sample_color = ray_color(r1, max_depth, world, lights);
+                                    r += sample_color.x();  
+                                    g += sample_color.y(); 
+                                    b += sample_color.z(); 
+                                }
                             }
-                        }
 
-                        color pixel_color(r, g, b);
-                        int* imgPtr = &image->data[3 * (j * image_width + i)];
-                        write_color(imgPtr, pixel_samples_scale * pixel_color);
+                            color pixel_color(r, g, b);
+                            int* imgPtr = &image->data[3 * (j * image_width + i)];
+                            write_color(imgPtr, pixel_samples_scale * pixel_color);
+                        }
+                    }
+                } else {
+                    #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
+                    for (int j = 0; j < image_height; j++) {
+                        for (int i = 0; i < image_width; i++) {
+                            if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                            color pixel_color(0,0,0);
+                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                                    ray r = get_ray(i, j, s_i, s_j);
+                                    pixel_color += ray_color(r, max_depth, world, lights);
+                                }
+                            }
+
+                            int* imgPtr = &image->data[3 * (j * image_width + i)];
+                            write_color(imgPtr, pixel_samples_scale * pixel_color);
+                        }
                     }
                 }
-            } else {
-                #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
-                for (int j = 0; j < image_height; j++) {
-                    for (int i = 0; i < image_width; i++) {
-                        if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
-                        color pixel_color(0,0,0);
-                        for (int s_j = 0; s_j < sqrt_spp; s_j++) {
-                            for (int s_i = 0; s_i < sqrt_spp; s_i++) {
-                                ray r = get_ray(i, j, s_i, s_j);
-                                pixel_color += ray_color(r, max_depth, world, lights);
-                            }
-                        }
+                
+                std::clog << "\rRendering Frame " << frame << " Done.       \n";
+                writePPMImage(image, filepath);
 
-                        int* imgPtr = &image->data[3 * (j * image_width + i)];
-                        write_color(imgPtr, pixel_samples_scale * pixel_color);
+                phi += delta_phi; 
+                if (phi >= 2 * pi) phi -= 2 * pi;
+                theta -= 0.01;
+                if (theta <= 0) theta = 0;
+            }
+        } else if (animation_method = 1) {
+            double step_scale = 0.6;
+            animation_sample = 42;
+
+            std::clog << "\rTotal frames: " << animation_sample << ": \n";
+            for (int frame = 0; frame < animation_sample; frame++) {
+                
+                if (frame < 7) {
+                    translate(FORWARD, step_scale);
+                } else if (frame < 14) {
+                    translate(BACKWARD, step_scale);
+                } else if (frame < 21) {
+                    translate(LEFT, step_scale);
+                } else if (frame < 28) {
+                    translate(RIGHT, step_scale);
+                } else if (frame < 35) {
+                    translate(UP, step_scale);
+                } else if (frame < 42) {
+                    translate(DOWN, step_scale);
+                }
+
+                initialize();
+
+                // Output file path
+                sprintf(filepath, "./images/animation/image%d.ppm", frame);
+
+                std::clog << "\rStart Rendering Frame " << frame << ": \n";
+                if (use_openmp) {
+                    omp_set_num_threads(num_threads);
+                    std::cout << "Max number of threads: " << omp_get_max_threads() << std::endl;
+                    std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU with OpenMP...\n";
+                } else {
+                    std::clog << "\rStart Rendering " << image_height * image_width << " pixels on CPU without OpenMP...\n";
+                }
+                
+                if (critical_section) {
+                    for (int j = 0; j < image_height; j++) {
+                        for (int i = 0; i < image_width; i++) {
+                            std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                            
+                            double r = 0.0, g = 0.0, b = 0.0;
+                            #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic) reduction(+: r, g, b)
+                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                                    ray r1 = get_ray(i, j, s_i, s_j);
+                                    color sample_color = ray_color(r1, max_depth, world, lights);
+                                    r += sample_color.x();  
+                                    g += sample_color.y(); 
+                                    b += sample_color.z(); 
+                                }
+                            }
+
+                            color pixel_color(r, g, b);
+                            int* imgPtr = &image->data[3 * (j * image_width + i)];
+                            write_color(imgPtr, pixel_samples_scale * pixel_color);
+                        }
+                    }
+                } else {
+                    #pragma omp parallel for if(use_openmp) collapse(2) schedule(dynamic)
+                    for (int j = 0; j < image_height; j++) {
+                        for (int i = 0; i < image_width; i++) {
+                            if (!use_openmp) std::clog << "\rPixels remaining: " << (image_width * image_height - (j * image_width + i)) << ' ' << std::flush;
+                            color pixel_color(0,0,0);
+                            for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+                                for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                                    ray r = get_ray(i, j, s_i, s_j);
+                                    pixel_color += ray_color(r, max_depth, world, lights);
+                                }
+                            }
+
+                            int* imgPtr = &image->data[3 * (j * image_width + i)];
+                            write_color(imgPtr, pixel_samples_scale * pixel_color);
+                        }
                     }
                 }
+                
+                std::clog << "\rRendering Frame " << frame << " Done.       \n";
+                writePPMImage(image, filepath);
             }
-            
-            std::clog << "\rRendering Frame " << frame << " Done.       \n";
-            writePPMImage(image, filepath);
-
-            phi += delta_phi; 
-            if (phi >= 2 * pi) phi -= 2 * pi;
-            theta -= 0.01;
-            if (theta <= 0) theta = 0;
-        }
+        } 
     }
 
 
@@ -344,6 +429,14 @@ class camera {
         if (direction == RIGHT) {
             lookfrom += u * step_scale;
             lookat += u * step_scale;
+        }
+        if (direction == UP) {
+            lookfrom += v * step_scale;
+            lookat += v * step_scale;
+        }
+        if (direction == DOWN) {
+            lookfrom += v * -step_scale;
+            lookat += v * -step_scale;
         }
     }
 
