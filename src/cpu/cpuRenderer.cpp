@@ -25,31 +25,12 @@ void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pi
         height1 += 0.2 * frame;
     } else if (frame < 10) {
         height1 += 0.2 * (9 - frame);
-        height2 += 0.24 * (frame - 5);
+        height2 += 0.2 * (frame - 5);
     } else if (frame < 15) {
-        height1 += 0.2 * (frame - 10);
-        height2 += 0.24 * (14 - frame);
-        height3 += 0.28 * (frame - 10);
+        height2 += 0.2 * (14 - frame);
+        height3 += 0.2 * (frame - 10);
     } else if (frame < 20) {
-        height1 += 0.2 * (19 - frame);
-        height2 += 0.24 * (frame - 15);
-        height3 += 0.28 * (19 - frame);
-    } else if (frame < 25) {
-        height1 += 0.2 * (frame - 20);
-        height2 += 0.24 * (24 - frame);
-        height3 += 0.28 * (frame - 20);
-    } else if (frame < 30) {
-        height1 += 0.2 * (29 - frame);
-        height2 += 0.24 * (frame - 25);
-        height3 += 0.28 * (29 - frame);
-    } else if (frame < 35) {
-        height1 += 0.2 * (frame - 30);
-        height2 += 0.24 * (34 - frame);
-        height3 += 0.28 * (frame - 30);
-    } else if (frame < 40) {
-        height1 += 0.2 * (39 - frame);
-        height2 += 0.24 * (frame - 35);
-        height3 += 0.28 * (39 - frame);
+        height3 += 0.2 * (19 - frame);
     } 
 
     auto checker = make_shared<checker_texture>(0.32, color(.8, .1, .1), color(.9, .9, .9));
@@ -424,18 +405,18 @@ int main() {
 
     // Animation (0: zoom + rotate. 1: translate. 2: bounce sphere)
     bool animation = true;
-    int animation_method = 1;
+    int animation_method = 2;
 
     // Hyperparameters
     int image_width = 600;               // Rendered image width in pixel count
     double aspect_ratio = 16.0 / 9.0;     // Ratio of image width over height
-    int samples_per_pixel = 10;          // Count of random samples for each pixel
-    int max_depth = 5;                   // Maximum number of ray bounces into scene
+    int samples_per_pixel = 200;          // Count of random samples for each pixel
+    int max_depth = 30;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
 
     auto startTime = std::chrono::high_resolution_clock::now();
     if (animation_method == 2) {
-        int total_frame = 40;
+        int total_frame = 20;
         for (int frame = 0; frame < total_frame; ++frame) {
             first_scene_moving(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method, total_frame, frame);
         }
