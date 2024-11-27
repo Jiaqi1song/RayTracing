@@ -405,7 +405,7 @@ int main() {
 
     // Animation (0: zoom + rotate. 1: translate. 2: bounce sphere)
     bool animation = true;
-    int animation_method = 2;
+    int animation_method = 1;
 
     // Hyperparameters
     int image_width = 600;               // Rendered image width in pixel count
