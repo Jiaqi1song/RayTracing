@@ -2,11 +2,12 @@
 #include "sphere.h"
 #include "texture.h"
 #include "quad.h"
-#include "bvh.h"
+#include "constant_medium.h"
+// #include "bvh.h"
 
 #include <chrono>
 
-#define MAX_OBJS 500
+#define MAX_OBJS 4000
 
 #define checkCudaErrors(val) check_cuda((val), #val, __FILE__, __LINE__)
 
@@ -84,12 +85,12 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new quad(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), new diffuse_light(color(15, 15, 15)));
 
     // Box
-    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new lambertian(color(.73, .73, .73)));
-    d_list[i++] = new quad(point3(424.38, 0, 252.29), vec3(42.71, 0, 159.38), vec3(0, 330, 0), new lambertian(color(.73, .73, .73)));
-    d_list[i++] = new quad(point3(467.08, 0, 411.67), vec3(-159.38, 0, 42.71), vec3(0, 330, 0), new lambertian(color(.73, .73, .73))); 
-    d_list[i++] = new quad(point3(307.71, 0, 454.38), vec3(-42.71, 0, -159.38), vec3(0, 330, 0), new lambertian(color(.73, .73, .73)));
-    d_list[i++] = new quad(point3(265, 330, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new lambertian(color(.73, .73, .73))); 
-    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(0, 330, 0), new lambertian(color(.73, .73, .73)));   
+    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(424.38, 0, 252.29), vec3(42.71, 0, 159.38), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(467.08, 0, 411.67), vec3(-159.38, 0, 42.71), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0)); 
+    d_list[i++] = new quad(point3(307.71, 0, 454.38), vec3(-42.71, 0, -159.38), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(265, 330, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new metal(color(0.8, 0.85, 0.88), 0.0)); 
+    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));   
 
 
     // Glass Sphere
@@ -101,6 +102,75 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
+__global__ void create_world3(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+                             int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{
+    curandState *local_rand_state = &devStates[0];
+
+    int i = 0;
+    int boxes_per_side = 20;
+    for (int k = 0; k < boxes_per_side; k++) {
+        for (int j = 0; j < boxes_per_side; j++) {
+            auto w = 100.0;
+            auto x0 = -1000.0 + k*w;
+            auto z0 = -1000.0 + j*w;
+            auto y0 = 0.0;
+            auto x1 = x0 + w;
+            auto y1 = random_int(1, 101, local_rand_state);
+            auto z1 = z0 + w;
+
+            point3 a = point3(x0,y0,z0);
+            point3 b = point3(x1,y1,z1);
+            auto min = point3(fminf(a.x(),b.x()), fminf(a.y(),b.y()), fminf(a.z(),b.z()));
+            auto max = point3(fmaxf(a.x(),b.x()), fmaxf(a.y(),b.y()), fmaxf(a.z(),b.z()));
+
+            auto dx = vec3(max.x() - min.x(), 0, 0);
+            auto dy = vec3(0, max.y() - min.y(), 0);
+            auto dz = vec3(0, 0, max.z() - min.z());
+
+            d_list[i++] = new quad(point3(min.x(), min.y(), max.z()),  dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // front
+            d_list[i++] = new quad(point3(max.x(), min.y(), max.z()), -dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // right
+            d_list[i++] = new quad(point3(max.x(), min.y(), min.z()), -dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // back
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // left
+            d_list[i++] = new quad(point3(min.x(), max.y(), max.z()),  dx, -dz, new lambertian(color(0.48, 0.83, 0.53))); // top
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dx,  dz, new lambertian(color(0.48, 0.83, 0.53))); // bottom
+        }
+    }
+
+    // Light
+    d_list[i++] = new quad(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), new diffuse_light(color(7, 7, 7)));
+
+    d_list[i++] = new sphere(point3(400, 400, 200), 50, new lambertian(color(0.7, 0.3, 0.1)));
+    d_list[i++] = new sphere(point3(260, 150, 45), 50, new dielectric(1.5));
+    d_list[i++] = new sphere(point3(0, 150, 145), 50, new metal(color(0.8, 0.8, 0.9), 1.0));
+
+    auto boundary = new sphere(point3(360,150,145), 70, new dielectric(1.5));
+    d_list[i++] = boundary;
+    d_list[i++] = new constant_medium(boundary, 0.2, color(0.2, 0.4, 0.9));
+
+    boundary = new sphere(point3(0,0,0), 5000, new dielectric(1.5));
+    d_list[i++] = new constant_medium(boundary, .0001, color(1,1,1));
+
+    auto checker = new checker_texture(0.32, color(.8, .1, .1), color(.9, .9, .9));
+    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(checker));
+
+    auto pertext = new noise_texture(0.2, local_rand_state);
+    d_list[i++] = new sphere(point3(220,280,300), 80, new lambertian(pertext));
+
+    int ns = 1000;
+    for (int j = 0; j < ns; j++) {
+        auto position = point3::random(local_rand_state,0,165) + point3(-100, 270, 395);
+        point3 position1 = point3(position.x(), position.y(), position.z());
+        d_list[i++] = new sphere(position1, 10, new lambertian(color(.73, .73, .73)));
+    }
+
+    *d_world = new hittable_list(d_list, i);
+
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(478, 278, -600), point3(278, 278, 0),
+                      vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
+}
+
+
 __global__ void free_world(hittable **d_list, hittable_list **d_world, camera **d_camera)
 {
     for (int i = 0; i < (*d_world)->obj_num; i++)
@@ -109,6 +179,8 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, camera **
             delete ((sphere*)d_list[i])->get_mat();     
         } else if (d_list[i]->get_type() == HittableType::QUAD) {
             delete ((quad*)d_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+            delete ((constant_medium*)d_list[i])->get_mat();          
         }
         delete d_list[i];
     }
@@ -135,8 +207,8 @@ int main()
     int image_height = 720;
     int samples_per_pixel = 200;
     int max_depth = 20;
-    int scene = 1;
-    bool use_bvh = false;
+    int scene = 3;
+    bool use_bvh = false; // TODO: Fix the dynamic memory allocation problems
 
     int total_pixels = image_width * image_height;
 
@@ -166,6 +238,7 @@ int main()
     switch (scene) {
         case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
         case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
     }
     
     checkCudaErrors(cudaGetLastError());

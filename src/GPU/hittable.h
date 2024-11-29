@@ -6,7 +6,7 @@
 #include "aabb.h"
 
 class material;
-enum HittableType { SPHERE, QUAD, HITTABLE_LIST, BVH};
+enum HittableType { SPHERE, QUAD, MEDIUM, HITTABLE_LIST, BVH};
 
 class hit_record
 {
@@ -30,7 +30,7 @@ class hittable
 {
 public:
     __device__ virtual ~hittable() {};
-    __device__ virtual bool hit(const ray &r, const interval &ray_t, hit_record &rec) const = 0;
+    __device__ virtual bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const = 0;
     __device__ virtual aabb bounding_box() const = 0;
     __device__ virtual HittableType get_type() const = 0; 
 };
@@ -51,7 +51,7 @@ public:
 
     __device__ HittableType get_type() const override { return HittableType::HITTABLE_LIST; }
 
-    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec) const override
+    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override
     {
         hit_record tmp_rec;
         bool hit_anything = false;
@@ -59,7 +59,7 @@ public:
 
         for (int i = 0; i < obj_num; ++i)
         {
-            if (objects[i]->hit(r, interval(ray_t.min, closest_t), tmp_rec))
+            if (objects[i]->hit(r, interval(ray_t.min, closest_t), tmp_rec, state))
             {
                 hit_anything = true;
                 closest_t = tmp_rec.t;

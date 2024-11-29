@@ -54,7 +54,7 @@ class camera
         for (int i = 0; i < max_depth; i++)
         {
             hit_record rec;
-            if ((*world)->hit(cur_ray, interval(0.001f, FLT_MAX), rec))
+            if ((*world)->hit(cur_ray, interval(0.001f, FLT_MAX), rec, state))
             {
                 ray scattered;
                 color attenuation;

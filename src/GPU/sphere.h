@@ -22,7 +22,7 @@ public:
     __device__ material* get_mat() { return mat; }
     __device__ HittableType get_type() const override { return HittableType::SPHERE; }
 
-    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec) const override
+    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override
     {
         vec3 ray_origin_to_sphere_center = center - r.origin();
         float a = r.direction().length_squared();

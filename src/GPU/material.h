@@ -107,5 +107,20 @@ class diffuse_light : public material
     texture_custum *tex;
 };
 
+class isotropic : public material {
+  public:
+    __device__ isotropic(const color& albedo) : tex(new solid_color(albedo)) {}
+    __device__ isotropic(texture_custum *tex) : tex(tex) {}
+
+    __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *state) const override {
+        scattered = ray(rec.hit_point, random_unit_vector(state));
+        attenuation = tex->value(rec.u, rec.v, rec.hit_point);
+        return true;
+    }
+
+  private:
+    texture_custum *tex;
+};
+
 
 #endif

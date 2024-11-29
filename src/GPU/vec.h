@@ -39,6 +39,11 @@ __device__ float random_float(curandState *state, float min, float max)
     return min + (max - min) * curand_uniform(state);
 }
 
+__device__  int random_int(int min, int max, curandState *state) {
+    // Returns a random integer in [min,max].
+    return int(random_float(state, float(min), float(max+1)));
+}
+
 class vec_base
 {
   protected:
@@ -221,6 +226,26 @@ class point3 : public vec_base
         e[2] -= v[2];
         return *this;
     }
+
+    __device__ point3 &operator*=(float t)
+    {
+        e[0] *= t;
+        e[1] *= t;
+        e[2] *= t;
+        return *this;
+    }
+
+    __device__ static point3 random(curandState *state)
+    {
+        return point3(random_float(state), random_float(state), random_float(state));
+    }
+
+    __device__ static point3 random(curandState *state, float min, float max)
+    {
+        return point3(random_float(state, min, max), random_float(state, min, max), random_float(state, min, max));
+    }
+
+
 };
 
 __device__ inline float distance_to_origin(const point3 &p)
@@ -242,6 +267,8 @@ __device__ inline bool operator==(const point3 &u, const point3 &v)
 __device__ inline bool operator!=(const point3 &u, const point3 &v) { return !(u == v); }
 
 __device__ inline vec3 operator-(point3 p1, point3 p2) { return vec3(p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]); }
+
+__device__ inline vec3 operator+(point3 p1, point3 p2) { return vec3(p1[0] + p2[0], p1[1] + p2[1], p1[2] + p2[2]); }
 
 __device__ inline point3 operator+(point3 p, vec3 v) { return point3(p[0] + v[0], p[1] + v[1], p[2] + v[2]); }
 

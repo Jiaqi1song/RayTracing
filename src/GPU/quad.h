@@ -30,7 +30,7 @@ class quad : public hittable {
 
     __device__ aabb bounding_box() const override { return bbox; }
 
-    __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState *state) const override {
         auto denom = dot(normal, r.direction());
 
         // No hit if the ray is parallel to the plane.
