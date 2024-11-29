@@ -39,6 +39,11 @@ __device__ float random_float(curandState *state, float min, float max)
     return min + (max - min) * curand_uniform(state);
 }
 
+__device__  int random_int(int min, int max, curandState *state) {
+    // Returns a random integer in [min,max].
+    return int(random_float(state, float(min), float(max+1)));
+}
+
 class vec_base
 {
   protected:
@@ -195,6 +200,18 @@ __device__ inline vec3 refract(const vec3 &v, const vec3 &n, float eta)
     return r_out_perp + r_out_parallel;
 }
 
+__device__ inline vec3 random_cosine_direction(curandState *state) {
+    auto r1 = random_float(state);
+    auto r2 = random_float(state);
+
+    auto phi = 2*PI*r1;
+    auto x = cosf(phi) * sqrtf(r2);
+    auto y = sinf(phi) * sqrtf(r2);
+    auto z = sqrtf(1-r2);
+
+    return vec3(x, y, z);
+}
+
 class point3 : public vec_base
 {
   public:
@@ -219,6 +236,14 @@ class point3 : public vec_base
         e[0] -= v[0];
         e[1] -= v[1];
         e[2] -= v[2];
+        return *this;
+    }
+
+    __device__ point3 &operator*=(float t)
+    {
+        e[0] *= t;
+        e[1] *= t;
+        e[2] *= t;
         return *this;
     }
 };

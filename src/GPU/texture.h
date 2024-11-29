@@ -1,6 +1,8 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
+#include "perlin.h"
+
 class texture_custum {
   public:
     __device__ virtual ~texture_custum() {};
@@ -42,6 +44,19 @@ class checker_texture : public texture_custum {
     float inv_scale;
     texture_custum *even;
     texture_custum *odd;
+};
+
+class noise_texture : public texture_custum {
+  public:
+    __device__ noise_texture(float scale, curandState *state) : scale(scale), noise(state) {}
+
+    __device__ color value(float u, float v, const point3& p) const override {
+        return color(.5, .5, .5) * (1 + sinf(scale * p.z() + 10 * noise.turb(p, 7)));
+    }
+
+  private:
+    perlin noise;
+    float scale;
 };
 
 

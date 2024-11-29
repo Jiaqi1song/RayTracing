@@ -30,7 +30,7 @@ class quad : public hittable {
 
     __device__ aabb bounding_box() const override { return bbox; }
 
-    __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState *state) const override {
         auto denom = dot(normal, r.direction());
 
         // No hit if the ray is parallel to the plane.
@@ -74,6 +74,25 @@ class quad : public hittable {
         return true;
     }
 
+    __device__ float pdf_value(const point3& origin, const vec3& direction, curandState *state) const override {
+        hit_record rec;
+        if (!this->hit(ray(origin, direction), interval(0.001, FLT_MAX), rec, state))
+            return 0;
+
+        auto distance_squared = rec.t * rec.t * direction.length_squared();
+        auto cosine = fabs(dot(direction, rec.normal_vector) / direction.length());
+
+        return distance_squared / (cosine * area);
+    }
+
+    __device__ vec3 random(const point3& origin, curandState *state) const override {
+        vec3 Q_vec3 = vec3(Q.x(), Q.y(), Q.z());
+        vec3 origin_vec3 = vec3(origin.x(), origin.y(), origin.z());
+
+        vec3 p = Q_vec3 + (random_float(state) * u) + (random_float(state) * v);
+        return p - origin_vec3;
+    }
+
   private:
     point3 Q;
     vec3 u, v;
@@ -82,6 +101,7 @@ class quad : public hittable {
     aabb bbox;
     vec3 normal;
     float D;
+    float area;
 };
 
 

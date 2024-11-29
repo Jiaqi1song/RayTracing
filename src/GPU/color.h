@@ -107,7 +107,7 @@ __device__ inline color operator*(float t, const color &v) { return color(t * v.
 
 __device__ inline color operator/(const color &u, float t)
 {
-    assert(t != 0.0f);
+    // assert(t != 0.0f);
     return color(u.r() / t, u.g() / t, u.b() / t);
 }
 

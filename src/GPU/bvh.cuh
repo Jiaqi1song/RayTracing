@@ -4,17 +4,16 @@
 #include "aabb.h"
 #include "hittable.h"
 
-#include <thrust/sort.h>
-#include <thrust/device_ptr.h>
+#include <algorithm>
 
 
 class bvh_node : public hittable {
   public:
-    // __device__ bvh_node(hittable_list list) : bvh_node(list.objects, 0, list.objects.size()) {}
+    __device__ bvh_node(hittable_list list) : bvh_node(list.objects, 0, list.objects.size()) {}
 
-    __device__ bvh_node(hittable **objects, size_t start, size_t end) {
+    __device__ bvh_node(std::vector<shared_ptr<hittable>>& objects, size_t start, size_t end) {
         // Build the bounding box of the span of source objects.
-        bbox = aabb::empty();
+        bbox = aabb::empty;
         for (size_t object_index=start; object_index < end; object_index++)
             bbox = aabb(bbox, objects[object_index]->bounding_box());
 
@@ -32,8 +31,7 @@ class bvh_node : public hittable {
             left = objects[start];
             right = objects[start+1];
         } else {
-            thrust::device_ptr<hittable*> dev_ptr(objects);
-            thrust::sort(dev_ptr + start, dev_ptr + end, comparator);
+            std::sort(std::begin(objects) + start, std::begin(objects) + end, comparator);
 
             auto mid = start + object_span/2;
             left = new bvh_node(objects, start, mid);
@@ -41,9 +39,7 @@ class bvh_node : public hittable {
         }
     }
 
-    __device__ HittableType get_type() const override { return HittableType::BVH; }
-
-    __device__ bool hit(const ray& r, const interval &ray_t, hit_record& rec) const override {
+    __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         if (!bbox.hit(r, ray_t))
             return false;
 
@@ -60,25 +56,23 @@ class bvh_node : public hittable {
     hittable *right;
     aabb bbox;
 
-    __device__ static bool box_compare (const hittable *a, const hittable *b, int axis_index) 
-    {
+    __device__ static bool box_compare(
+        const hittable *a, const hittable *b, int axis_index
+    ) {
         auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
         auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
         return a_axis_interval.min < b_axis_interval.min;
     }
 
-    __device__ static bool box_x_compare (const hittable *a, const hittable *b) 
-    {
+    __device__ static bool box_x_compare (const hittable *a, const hittable *b) {
         return box_compare(a, b, 0);
     }
 
-    __device__ static bool box_y_compare (const hittable *a, const hittable *b) 
-    {
+    __device__ static bool box_y_compare (const hittable *a, const hittable *b) {
         return box_compare(a, b, 1);
     }
 
-    __device__ static bool box_z_compare (const hittable *a, const hittable *b) 
-    {
+    __device__ static bool box_z_compare (const hittable *a, const hittable *b) {
         return box_compare(a, b, 2);
     }
 };
