@@ -50,8 +50,10 @@ class camera
     __device__ color ray_color(const ray &r, hittable_list **world, curandState *state)
     {
         ray cur_ray = r;
+        color final_color = color(0.0f, 0.0f, 0.0f);
         color cur_attenuation = color(1.0f, 1.0f, 1.0f);
-        for (int i = 0; i < max_depth; i++)
+        int depth = 0;
+        for (; depth < max_depth; depth++)
         {
             hit_record rec;
             if ((*world)->hit(cur_ray, interval(0.001f, FLT_MAX), rec, state))
@@ -62,21 +64,27 @@ class camera
                 
                 if (rec.mat->scatter(cur_ray, rec, attenuation, scattered, state))
                 {
-                    cur_attenuation *= attenuation;
-                    cur_attenuation += color_from_emission;
+                    final_color += cur_attenuation * color_from_emission;
+                    cur_attenuation = cur_attenuation * attenuation;
                     cur_ray = scattered;
+                    continue;
                 }
                 else
                 {
-                    return cur_attenuation * color_from_emission;
+                    final_color += cur_attenuation * color_from_emission;
+                    break;
                 }
             }
             else
             {
-                return cur_attenuation * background;
+                final_color += cur_attenuation * background;
+                break;
             }
         }
-        return color();
+        if (depth >= max_depth) {
+            return color(0,0,0);
+        }
+        return final_color;
     }
 
     __device__ point3 defocus_disk_sample(curandState *state) const

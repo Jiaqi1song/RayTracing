@@ -201,12 +201,18 @@ __global__ void call_render(hittable_list **d_world, camera **cam, int image_wid
     (*cam)->render(d_world, i, j, local_rand_state, output);
 }
 
+__global__ void rand_init(curandState *rand_state, unsigned long seed) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        curand_init(seed, 0, 0, rand_state);
+    }
+}
+
 int main()
 {
     int image_width = 1080;
     int image_height = 720;
-    int samples_per_pixel = 200;
-    int max_depth = 20;
+    int samples_per_pixel = 10000;
+    int max_depth = 50;
     int scene = 3;
     bool use_bvh = false; // TODO: Fix the dynamic memory allocation problems
 
@@ -214,6 +220,9 @@ int main()
 
     curandState *devStates;
     checkCudaErrors(cudaMalloc((void **)&devStates, total_pixels * sizeof(curandState)));
+    curandState *d_rand_state;
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state, 1*sizeof(curandState)));
+
     hittable **d_list;
     checkCudaErrors(cudaMalloc((void **)&d_list, MAX_OBJS * sizeof(hittable *)));
     hittable_list **d_world;
@@ -230,15 +239,16 @@ int main()
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    unsigned long seed = static_cast<unsigned long>(start_time.time_since_epoch().count());
+    unsigned long seed = 1984;
+    rand_init<<<1, 1>>>(d_rand_state, seed);
     init_random_state<<<gridSize, blockSize>>>(devStates, image_width, image_height, seed);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
     switch (scene) {
-        case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
-        case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
-        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
+        case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
     }
     
     checkCudaErrors(cudaGetLastError());
