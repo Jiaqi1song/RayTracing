@@ -18,6 +18,9 @@ class constant_medium : public hittable {
         phase_function(new isotropic(albedo))
     {}
 
+    __device__ material* get_mat() { return phase_function; }
+    __device__ HittableType get_type() const override { return HittableType::MEDIUM; }
+
     __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override {
         hit_record rec1, rec2;
 

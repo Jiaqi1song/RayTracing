@@ -121,6 +121,85 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, hittab
     }
 }
 
+__global__ void create_world3(hittable **d_list, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, dynamic_pdf **d_pdf, camera **cam, int image_width,
+                             int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{
+    curandState *local_rand_state = &devStates[0];
+
+    int i = 0;
+    int boxes_per_side = 20;
+    for (int k = 0; k < boxes_per_side; k++) {
+        for (int j = 0; j < boxes_per_side; j++) {
+            auto w = 100.0;
+            auto x0 = -1000.0 + k*w;
+            auto z0 = -1000.0 + j*w;
+            auto y0 = 0.0;
+            auto x1 = x0 + w;
+            auto y1 = random_int(1, 101, local_rand_state);
+            auto z1 = z0 + w;
+
+            point3 a = point3(x0,y0,z0);
+            point3 b = point3(x1,y1,z1);
+            auto min = point3(fminf(a.x(),b.x()), fminf(a.y(),b.y()), fminf(a.z(),b.z()));
+            auto max = point3(fmaxf(a.x(),b.x()), fmaxf(a.y(),b.y()), fmaxf(a.z(),b.z()));
+
+            auto dx = vec3(max.x() - min.x(), 0, 0);
+            auto dy = vec3(0, max.y() - min.y(), 0);
+            auto dz = vec3(0, 0, max.z() - min.z());
+
+            d_list[i++] = new quad(point3(min.x(), min.y(), max.z()),  dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // front
+            d_list[i++] = new quad(point3(max.x(), min.y(), max.z()), -dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // right
+            d_list[i++] = new quad(point3(max.x(), min.y(), min.z()), -dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // back
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // left
+            d_list[i++] = new quad(point3(min.x(), max.y(), max.z()),  dx, -dz, new lambertian(color(0.48, 0.83, 0.53))); // top
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dx,  dz, new lambertian(color(0.48, 0.83, 0.53))); // bottom
+        }
+    }
+
+    // Light
+    d_list[i++] = new quad(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), new diffuse_light(color(7, 7, 7)));
+
+    d_list[i++] = new sphere(point3(400, 400, 200), 50, new lambertian(color(0.7, 0.3, 0.1)));
+    d_list[i++] = new sphere(point3(260, 150, 45), 50, new dielectric(1.5));
+    d_list[i++] = new sphere(point3(0, 150, 145), 50, new metal(color(0.8, 0.8, 0.9), 1.0));
+
+    auto boundary = new sphere(point3(360,150,145), 70, new dielectric(1.5));
+    d_list[i++] = boundary;
+    d_list[i++] = new constant_medium(boundary, 0.2, color(0.2, 0.4, 0.9));
+
+    boundary = new sphere(point3(0,0,0), 5000, new dielectric(1.5));
+    d_list[i++] = new constant_medium(boundary, .0001, color(1,1,1));
+
+    auto checker = new checker_texture(0.32, color(.8, .1, .1), color(.9, .9, .9));
+    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(checker));
+
+    auto pertext = new noise_texture(0.2, local_rand_state);
+    d_list[i++] = new sphere(point3(220,280,300), 80, new lambertian(pertext));
+
+    int ns = 1000;
+    for (int j = 0; j < ns; j++) {
+        auto position = point3::random(local_rand_state,0,165) + point3(-100, 270, 395);
+        point3 position1 = point3(position.x(), position.y(), position.z());
+        d_list[i++] = new sphere(position1, 10, new lambertian(color(.73, .73, .73)));
+    }
+
+    *d_world = new hittable_list(d_list, i);
+
+    // Light Sources
+    d_light_list[0] = new quad(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), new material());
+    d_light_list[1] = new quad(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), new material());
+    *d_lights = new hittable_list(d_light_list, 2);
+
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(478, 278, -600), point3(278, 278, 0),
+                      vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
+    
+    for (int i = 0; i < max_depth; i++)
+    {
+        d_pdf[i] = new dynamic_pdf();
+    }
+}
+
+
 __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, dynamic_pdf **d_pdf, camera **d_camera, int max_depth)
 {
     for (int i = 0; i < (*d_world)->obj_num; i++)
@@ -129,6 +208,8 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable 
             delete ((sphere*)d_list[i])->get_mat();     
         } else if (d_list[i]->get_type() == HittableType::QUAD) {
             delete ((quad*)d_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+            delete ((constant_medium*)d_list[i])->get_mat();          
         }
         delete d_list[i];
     }
@@ -139,6 +220,8 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable 
             delete ((sphere*)d_light_list[i])->get_mat();     
         } else if (d_light_list[i]->get_type() == HittableType::QUAD) {
             delete ((quad*)d_light_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+            delete ((constant_medium*)d_light_list[i])->get_mat();          
         }
         delete d_light_list[i];
     }
@@ -166,6 +249,12 @@ __global__ void call_render(hittable_list **d_world, hittable_list **d_lights, d
     (*cam)->render(d_world, d_lights, d_pdf, i, j, local_rand_state, output);
 }
 
+__global__ void rand_init(curandState *rand_state, unsigned long seed) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        curand_init(seed, 0, 0, rand_state);
+    }
+}
+
 int main()
 {
     int image_width = 1080;
@@ -179,6 +268,9 @@ int main()
 
     curandState *devStates;
     checkCudaErrors(cudaMalloc((void **)&devStates, total_pixels * sizeof(curandState)));
+    curandState *d_rand_state;
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state, 1*sizeof(curandState)));
+
     hittable **d_list;
     checkCudaErrors(cudaMalloc((void **)&d_list, MAX_OBJS * sizeof(hittable *)));
     hittable **d_light_list;
@@ -201,14 +293,16 @@ int main()
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    unsigned long seed = static_cast<unsigned long>(start_time.time_since_epoch().count());
+    unsigned long seed = 1984;
+    rand_init<<<1, 1>>>(d_rand_state, seed);
     init_random_state<<<gridSize, blockSize>>>(devStates, image_width, image_height, seed);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
     switch (scene) {
-        case 1: create_world1<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, d_pdf, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
-        case 2: create_world2<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, d_pdf, cam, image_width, image_height, devStates, samples_per_pixel, max_depth, use_bvh); break;
+        case 1: create_world1<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, d_pdf, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 2: create_world2<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, d_pdf, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, d_pdf, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
     }
     
     checkCudaErrors(cudaGetLastError());

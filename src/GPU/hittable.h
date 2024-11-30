@@ -9,7 +9,7 @@
 #include <thrust/device_ptr.h>
 
 class material;
-enum HittableType { SPHERE, QUAD, HITTABLE_LIST, BVH};
+enum HittableType { SPHERE, QUAD, MEDIUM, HITTABLE_LIST, BVH};
 
 class hit_record
 {
