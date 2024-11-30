@@ -11,9 +11,10 @@ set ( CMAKE_CXX_STANDARD          17 )
 set ( CMAKE_CXX_STANDARD_REQUIRED ON )
 set ( CMAKE_CXX_EXTENSIONS        ON )
 
-# RTX 2080: Turing architecture (75) 
-# RTX 3060: Ampere architecture (86)
-set(CMAKE_CUDA_ARCHITECTURES 75 86 )
+# NVIDIA RTX 2080: Turing architecture (75) 
+# NVIDIA RTX 3060: Ampere architecture (86)
+# Tesla V100:       Volta architecture (70)
+set(CMAKE_CUDA_ARCHITECTURES 70 75 86 )
 
 # Source
 set ( CPURENDERER

@@ -11,7 +11,7 @@ render=cpu
 #   1: first_scene
 #   2: cornell_box
 #   3: final_scene
-scene=1
+scene=3
 
 # Image size
 image_width=600
@@ -32,7 +32,7 @@ num_threads=8;
 critical_section=false;
 
 # Select if use BVH for CPU or CUDA (only support on CPU now)
-use_bvh=falase;
+use_bvh=false;
 
 # Number of sample and depth
 samples_per_pixel=200

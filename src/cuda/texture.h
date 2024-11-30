@@ -52,7 +52,7 @@ class noise_texture : public texture_custum {
     __device__ noise_texture(float scale, curandState *state) : scale(scale), noise(state) {}
 
     __device__ color value(float u, float v, const point3& p) const override {
-        return color(.5, .5, .5) * (1 + std::sin(scale * p.z() + 10 * noise.turb(p, 7)));
+        return color(.5, .5, .5) * (1 + sinf(scale * p.z() + 10 * noise.turb(p, 7)));
     }
 
   private:
