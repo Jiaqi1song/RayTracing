@@ -13,6 +13,7 @@
 #include <iostream>
 #include <chrono>
 #include <string>
+#include <cstdlib>
 
 void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method, int total_frame, int frame) {
     hittable_list world;
@@ -230,71 +231,6 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     }
 }
 
-void cornell_smoke(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method) {
-    hittable_list world;
-
-    auto red   = make_shared<lambertian>(color(.65, .05, .05));
-    auto white = make_shared<lambertian>(color(.73, .73, .73));
-    auto green = make_shared<lambertian>(color(.12, .45, .15));
-    auto light = make_shared<diffuse_light>(color(15, 15, 15));
-
-    // Cornell box sides
-    world.add(make_shared<quad>(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), green));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), red));
-    world.add(make_shared<quad>(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), white));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), white));
-    world.add(make_shared<quad>(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), white));
-
-    // Light
-    world.add(make_shared<quad>(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), light));
-
-    shared_ptr<hittable> box1 = box(point3(0,0,0), point3(165,330,165), white);
-    box1 = make_shared<rotate_y>(box1, 15);
-    box1 = make_shared<translate>(box1, vec3(265,0,295));
-
-    shared_ptr<hittable> box2 = box(point3(0,0,0), point3(165,165,165), white);
-    box2 = make_shared<rotate_y>(box2, -18);
-    box2 = make_shared<translate>(box2, vec3(130,0,65));
-
-    world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)));
-    world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
-
-    // If use BVH to accelrate the rendering process
-    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
-
-    // Light Sources
-    auto empty_material = shared_ptr<material>();
-    hittable_list lights;
-    lights.add(make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
-
-    camera renderer;
-
-    renderer.aspect_ratio      = aspect_ratio;
-    renderer.image_width       = image_width;
-    renderer.samples_per_pixel = samples_per_pixel;
-    renderer.max_depth         = max_depth;
-    renderer.background        = color(0,0,0);
-    renderer.use_openmp        = use_openmp;
-    renderer.num_threads       = num_threads;
-    renderer.filename          = filename;
-    renderer.critical_section  = critical_section;
-    renderer.use_bvh           = use_bvh;
-
-    renderer.vfov     = 40;
-    renderer.lookfrom = point3(278, 278, -800);
-    renderer.lookat   = point3(278, 278, 0);
-    renderer.vup      = vec3(0, 1, 0);
-
-    renderer.defocus_angle = 0;
-
-    if (animation) {
-        renderer.render_animation(world, lights);
-        renderer.animation_method = animation_method;
-    } else {
-        renderer.render(world, lights);
-    }
-}
-
 void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
@@ -337,7 +273,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     boundary = make_shared<sphere>(point3(0,0,0), 5000, make_shared<dielectric>(1.5));
     world.add(make_shared<constant_medium>(boundary, .0001, color(1,1,1)));
 
-    auto emat = make_shared<lambertian>(make_shared<image_texture>("earthmap.jpg"));
+    auto emat = make_shared<lambertian>(make_shared<image_texture>("resource/earthmap.jpg"));
     world.add(make_shared<sphere>(point3(400,200,400), 100, emat));
     auto pertext = make_shared<noise_texture>(0.2);
     world.add(make_shared<sphere>(point3(220,280,300), 80, make_shared<lambertian>(pertext)));
@@ -393,7 +329,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 }
 
 
-int main() {
+int main(int argc, char* argv[]) {
     // Scene selection
     int scene = 1;         
 
@@ -414,6 +350,25 @@ int main() {
     int max_depth = 30;                   // Maximum number of ray bounces into scene
     std::string filename = "test.ppm";    // Output file name
 
+    // Parsing input arguments
+    if (argc > 1) { 
+        scene = std::atoi(argv[1]); 
+        samples_per_pixel = std::atoi(argv[2]); 
+        max_depth = std::atoi(argv[3]); 
+        animation = std::string(argv[4]) == "true";
+        animation_method = std::atoi(argv[5]);
+        use_openmp = std::string(argv[6]) == "true";
+        use_bvh = std::string(argv[7]) == "true";
+        num_threads = std::atoi(argv[8]);
+        critical_section = std::string(argv[9]) == "true";
+    }
+
+    std::clog << "samples_per_pixel: " << samples_per_pixel << " \n";
+    std::clog << "max_depth: " << max_depth << " \n";
+    std::clog << "animation: " << animation << " \n";
+    std::clog << "animation_method: " << animation_method << " \n";
+    std::clog << "use_bvh: " << use_bvh << " \n";
+
     auto startTime = std::chrono::high_resolution_clock::now();
     if (animation_method == 2) {
         int total_frame = 20;
@@ -424,8 +379,7 @@ int main() {
         switch (scene) {
             case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
             case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
-            case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);   break;
-            default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
+            case 3:  final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
         }
     }
     

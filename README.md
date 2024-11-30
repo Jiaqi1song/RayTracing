@@ -4,7 +4,7 @@
 
 We use the CPU start code from [Ray Tracing in One Weekend series](https://raytracing.github.io/). We plan to use OpenMP and CUDA to accelerate the rendering process.
 
-## TODO List
+## Check List
 
 ### CPU Renderer
 
@@ -16,12 +16,17 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 
 ### CUDA Renderer
 
-- [ ] Basic setup on CUDA 
-- [ ] Benchmark test case
+- [x] Basic setup on CUDA 
+- [x] Benchmark test case
 - [ ] Monte Carlo sampling on CUDA 
 - [ ] BVH acceleration on CUDA 
 - [ ] Animation
 
+## Compile and run the ray tracer (modify the parameters in the render.sh script)
+
+```bash
+bash render.sh
+```
 
 ## Reference output image
 
@@ -34,14 +39,11 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 ### First Scene Animation (bounce sphere)
 ![image](./images/animation3.gif)
 
-### Cornell Box
-![image](./images/cornell_box.png)
-
-### Cornell Smoke
-![image](./images/cornell_smoke.png)
-
 ### First Scene
 ![image](./images/first_scene.png)
+
+### Cornell Box
+![image](./images/cornell_box.png)
 
 ### Final scene
 ![image](./images/final_scene.png)

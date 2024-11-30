@@ -1,318 +1,313 @@
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include "camera.h"
+#include "sphere.h"
+#include "texture.h"
+#include "quad.h"
+#include "constant_medium.h"
+// #include "bvh.h"
 
-#include "utils.cuh"
-
-#include "bvh.cuh"
-#include "camera.cuh"
-#include "constant_medium.cuh"
-#include "hittable_list.cuh"
-#include "material.cuh"
-#include "quad.cuh"
-#include "sphere.cuh"
-#include "texture.cuh"
-
-#include <iomanip> 
-#include <iostream>
 #include <chrono>
-#include <string>
+#include <cstdlib>
 
-void first_scene(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
-    hittable_list world;
+#define MAX_OBJS 4000
 
-    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
-    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
+#define checkCudaErrors(val) check_cuda((val), #val, __FILE__, __LINE__)
 
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            auto choose_mat = random_float();
-            point3 center(a + 0.9*random_float(), 0.2, b + 0.9*random_float());
+void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line)
+{
+    if (result)
+    {
+        std::cerr << "CUDA error = " << static_cast<unsigned int>(result) << " at " << file << ":" << line << " '"
+                  << func << "' \n";
+        // Make sure we call CUDA Device Reset before exiting
+        cudaDeviceReset();
+        exit(99);
+    }
+}
 
-            if ((center - point3(4, 0.2, 0)).length() > 0.9) {
-                shared_ptr<material> sphere_material;
+__global__ void create_world1(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+                             int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{
+    curandState *local_rand_state = &devStates[0];
 
-                if (choose_mat < 0.8) {
-                    // diffuse
-                    auto albedo = color::random() * color::random();
-                    sphere_material = make_shared<lambertian>(albedo);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                } else if (choose_mat < 0.95) {
-                    // metal
-                    auto albedo = color::random(0.5, 1);
-                    auto fuzz = random_float(0, 0.5);
-                    sphere_material = make_shared<metal>(albedo, fuzz);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                } else {
-                    // glass
-                    sphere_material = make_shared<dielectric>(1.5);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                }
+    auto checker = new checker_texture(0.32, color(.8, .1, .1), color(.9, .9, .9));
+
+    d_list[0] = new sphere(point3(0.0f, -1000.0f, -1.0f), 1000.0f, new lambertian(checker));
+    int i = 1;
+    for (int a = -11; a < 11; a++)
+    {
+        for (int b = -11; b < 11; b++)
+        {
+            float choose_mat = random_float(local_rand_state);
+            point3 center(a + random_float(local_rand_state), 0.2f, b + random_float(local_rand_state));
+            if (choose_mat < 0.8f)
+            {
+                d_list[i++] =
+                    new sphere(center, 0.2f,
+                               new lambertian(color(random_float(local_rand_state) * random_float(local_rand_state),
+                                                    random_float(local_rand_state) * random_float(local_rand_state),
+                                                    random_float(local_rand_state) * random_float(local_rand_state))));
+            }
+            else if (choose_mat < 0.95f)
+            {
+                d_list[i++] = new sphere(center, 0.2f,
+                                         new metal(color(0.5f * (1.0f + random_float(local_rand_state)),
+                                                         0.5f * (1.0f + random_float(local_rand_state)),
+                                                         0.5f * (1.0f + random_float(local_rand_state))),
+                                                   0.5f * random_float(local_rand_state)));
+            }
+            else
+            {
+                d_list[i++] = new sphere(center, 0.2f, new dielectric(1.5));
             }
         }
     }
-
-    auto material1 = make_shared<dielectric>(1.5);
-    world.add(make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
-
-    auto material2 = make_shared<lambertian>(color(0.4, 0.2, 0.1));
-    world.add(make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
-
-    auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
-    world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
-
-    world = hittable_list(make_shared<bvh_node>(world));
-
-    // Light Sources
-    auto empty_material = shared_ptr<material>();
-    hittable_list lights;
-    lights.add(make_shared<sphere>(point3(0,-1000,0), 1, empty_material));
+    d_list[i++] = new sphere(point3(0.0f, 1.0f, 0.0f), 1.0f, new dielectric(1.5f));
+    d_list[i++] = new sphere(point3(-4.0f, 1.0f, 0.0f), 1.0f, new lambertian(color(0.4f, 0.2f, 0.1f)));
+    d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
-    camera renderer;
+    *d_world = new hittable_list(d_list, i);
 
-    renderer.aspect_ratio      = aspect_ratio;
-    renderer.image_width       = image_width;
-    renderer.samples_per_pixel = samples_per_pixel;
-    renderer.max_depth         = max_depth;
-    renderer.background        = color(0.70, 0.80, 1.00);
-    renderer.use_openmp        = use_openmp;
-    renderer.num_threads       = num_threads;
-    renderer.filename          = filename;
-
-    renderer.vfov     = 20;
-    renderer.lookfrom = point3(13,2,3);
-    renderer.lookat   = point3(0,0,0);
-    renderer.vup      = vec3(0,1,0);
-
-    renderer.defocus_angle = 0.6;
-    renderer.focus_dist    = 10.0;
-
-    renderer.render(world, lights);
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 20.0f, point3(13.0f, 2.0f, 3.0f), point3(0.0f, 0.0f, 0.0f),
+                      vec3(0.0f, 1.0f, 0.0f), 0.6f, 10.0f, color(0.70, 0.80, 1.00));
 }
 
-
-void cornell_box(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
-    hittable_list world;
-
-    auto red   = make_shared<lambertian>(color(.65, .05, .05));
-    auto white = make_shared<lambertian>(color(.73, .73, .73));
-    auto green = make_shared<lambertian>(color(.12, .45, .15));
-    auto light = make_shared<diffuse_light>(color(15, 15, 15));
-
+__global__ void create_world2(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+                             int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{
     // Cornell box sides
-    world.add(make_shared<quad>(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), green));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), red));
-    world.add(make_shared<quad>(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), white));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), white));
-    world.add(make_shared<quad>(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), white));
+    int i = 0;
+    d_list[i++] = new quad(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), new lambertian(color(.12, .45, .15)));
+    d_list[i++] = new quad(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), new lambertian(color(.65, .05, .05)));
+    d_list[i++] = new quad(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), new lambertian(color(.73, .73, .73)));
+    d_list[i++] = new quad(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), new lambertian(color(.73, .73, .73)));
+    d_list[i++] = new quad(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), new lambertian(color(.73, .73, .73)));
 
     // Light
-    world.add(make_shared<quad>(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), light));
+    d_list[i++] = new quad(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), new diffuse_light(color(15, 15, 15)));
 
     // Box
-    shared_ptr<hittable> box1 = box(point3(0,0,0), point3(165,330,165), white);
-    box1 = make_shared<rotate_y>(box1, 15);
-    box1 = make_shared<translate>(box1, vec3(265,0,295));
-    world.add(box1);
+    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(424.38, 0, 252.29), vec3(42.71, 0, 159.38), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(467.08, 0, 411.67), vec3(-159.38, 0, 42.71), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0)); 
+    d_list[i++] = new quad(point3(307.71, 0, 454.38), vec3(-42.71, 0, -159.38), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));
+    d_list[i++] = new quad(point3(265, 330, 295), vec3(159.38, 0, -42.71), vec3(42.71, 0, 159.38), new metal(color(0.8, 0.85, 0.88), 0.0)); 
+    d_list[i++] = new quad(point3(265, 0, 295), vec3(159.38, 0, -42.71), vec3(0, 330, 0), new metal(color(0.8, 0.85, 0.88), 0.0));   
+
 
     // Glass Sphere
-    auto glass = make_shared<dielectric>(1.5);
-    world.add(make_shared<sphere>(point3(190,90,190), 90, glass));
+    d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
+    
+    *d_world = new hittable_list(d_list, i);
 
-    // Light Sources
-    auto empty_material = shared_ptr<material>();
-    hittable_list lights;
-    lights.add(
-        make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
-    lights.add(make_shared<sphere>(point3(190, 90, 190), 90, empty_material));
-
-    camera renderer;
-
-    renderer.aspect_ratio      = aspect_ratio;
-    renderer.image_width       = image_width;
-    renderer.samples_per_pixel = samples_per_pixel;
-    renderer.max_depth         = max_depth;
-    renderer.background        = color(0,0,0);
-    renderer.use_openmp        = use_openmp;
-    renderer.num_threads       = num_threads;
-    renderer.filename          = filename;
-
-    renderer.vfov     = 40;
-    renderer.lookfrom = point3(278, 278, -800);
-    renderer.lookat   = point3(278, 278, 0);
-    renderer.vup      = vec3(0, 1, 0);
-
-    renderer.defocus_angle = 0;
-
-    renderer.render(world, lights);
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(278.0f, 278.0f, -800.0f), point3(278.0f, 278.0f, 0.0f),
+                      vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
-void cornell_smoke(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
-    hittable_list world;
+__global__ void create_world3(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+                             int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{
+    curandState *local_rand_state = &devStates[0];
 
-    auto red   = make_shared<lambertian>(color(.65, .05, .05));
-    auto white = make_shared<lambertian>(color(.73, .73, .73));
-    auto green = make_shared<lambertian>(color(.12, .45, .15));
-    auto light = make_shared<diffuse_light>(color(15, 15, 15));
-
-    // Cornell box sides
-    world.add(make_shared<quad>(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), green));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), red));
-    world.add(make_shared<quad>(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), white));
-    world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), white));
-    world.add(make_shared<quad>(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), white));
-
-    // Light
-    world.add(make_shared<quad>(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), light));
-
-    shared_ptr<hittable> box1 = box(point3(0,0,0), point3(165,330,165), white);
-    box1 = make_shared<rotate_y>(box1, 15);
-    box1 = make_shared<translate>(box1, vec3(265,0,295));
-
-    shared_ptr<hittable> box2 = box(point3(0,0,0), point3(165,165,165), white);
-    box2 = make_shared<rotate_y>(box2, -18);
-    box2 = make_shared<translate>(box2, vec3(130,0,65));
-
-    world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)));
-    world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
-
-    // Light Sources
-    auto empty_material = shared_ptr<material>();
-    hittable_list lights;
-    lights.add(make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
-
-    camera renderer;
-
-    renderer.aspect_ratio      = aspect_ratio;
-    renderer.image_width       = image_width;
-    renderer.samples_per_pixel = samples_per_pixel;
-    renderer.max_depth         = max_depth;
-    renderer.background        = color(0,0,0);
-    renderer.use_openmp        = use_openmp;
-    renderer.num_threads       = num_threads;
-    renderer.filename          = filename;
-
-    renderer.vfov     = 40;
-    renderer.lookfrom = point3(278, 278, -800);
-    renderer.lookat   = point3(278, 278, 0);
-    renderer.vup      = vec3(0, 1, 0);
-
-    renderer.defocus_angle = 0;
-
-    renderer.render(world, lights);
-}
-
-void final_scene(int image_width, float aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename) {
-    hittable_list boxes1;
-    auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
-
+    int i = 0;
     int boxes_per_side = 20;
-    for (int i = 0; i < boxes_per_side; i++) {
+    for (int k = 0; k < boxes_per_side; k++) {
         for (int j = 0; j < boxes_per_side; j++) {
             auto w = 100.0;
-            auto x0 = -1000.0 + i*w;
+            auto x0 = -1000.0 + k*w;
             auto z0 = -1000.0 + j*w;
             auto y0 = 0.0;
             auto x1 = x0 + w;
-            auto y1 = random_float(1,101);
+            auto y1 = random_int(1, 101, local_rand_state);
             auto z1 = z0 + w;
 
-            boxes1.add(box(point3(x0,y0,z0), point3(x1,y1,z1), ground));
+            point3 a = point3(x0,y0,z0);
+            point3 b = point3(x1,y1,z1);
+            auto min = point3(fminf(a.x(),b.x()), fminf(a.y(),b.y()), fminf(a.z(),b.z()));
+            auto max = point3(fmaxf(a.x(),b.x()), fmaxf(a.y(),b.y()), fmaxf(a.z(),b.z()));
+
+            auto dx = vec3(max.x() - min.x(), 0, 0);
+            auto dy = vec3(0, max.y() - min.y(), 0);
+            auto dz = vec3(0, 0, max.z() - min.z());
+
+            d_list[i++] = new quad(point3(min.x(), min.y(), max.z()),  dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // front
+            d_list[i++] = new quad(point3(max.x(), min.y(), max.z()), -dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // right
+            d_list[i++] = new quad(point3(max.x(), min.y(), min.z()), -dx,  dy, new lambertian(color(0.48, 0.83, 0.53))); // back
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dz,  dy, new lambertian(color(0.48, 0.83, 0.53))); // left
+            d_list[i++] = new quad(point3(min.x(), max.y(), max.z()),  dx, -dz, new lambertian(color(0.48, 0.83, 0.53))); // top
+            d_list[i++] = new quad(point3(min.x(), min.y(), min.z()),  dx,  dz, new lambertian(color(0.48, 0.83, 0.53))); // bottom
         }
     }
 
-    hittable_list world;
+    // Light
+    d_list[i++] = new quad(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), new diffuse_light(color(7, 7, 7)));
 
-    world.add(make_shared<bvh_node>(boxes1));
+    d_list[i++] = new sphere(point3(400, 400, 200), 50, new lambertian(color(0.7, 0.3, 0.1)));
+    d_list[i++] = new sphere(point3(260, 150, 45), 50, new dielectric(1.5));
+    d_list[i++] = new sphere(point3(0, 150, 145), 50, new metal(color(0.8, 0.8, 0.9), 1.0));
 
-    auto light = make_shared<diffuse_light>(color(15, 15, 15));
-    world.add(make_shared<quad>(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), light));
+    auto boundary = new sphere(point3(360,150,145), 70, new dielectric(1.5));
+    d_list[i++] = boundary;
+    d_list[i++] = new constant_medium(boundary, 0.2, color(0.2, 0.4, 0.9));
 
-    auto center1 = point3(400, 400, 200);
-    auto center2 = center1 + vec3(30,0,0);
-    auto sphere_material = make_shared<lambertian>(color(0.7, 0.3, 0.1));
-    world.add(make_shared<sphere>(center1, center2, 50, sphere_material));
+    boundary = new sphere(point3(0,0,0), 5000, new dielectric(1.5));
+    d_list[i++] = new constant_medium(boundary, .0001, color(1,1,1));
 
-    world.add(make_shared<sphere>(point3(260, 150, 45), 50, make_shared<dielectric>(1.5)));
-    world.add(make_shared<sphere>(
-        point3(0, 150, 145), 50, make_shared<metal>(color(0.8, 0.8, 0.9), 1.0)
-    ));
+    auto checker = new checker_texture(0.32, color(.8, .1, .1), color(.9, .9, .9));
+    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(checker));
 
-    auto boundary = make_shared<sphere>(point3(360,150,145), 70, make_shared<dielectric>(1.5));
-    world.add(boundary);
-    world.add(make_shared<constant_medium>(boundary, 0.2, color(0.2, 0.4, 0.9)));
-    boundary = make_shared<sphere>(point3(0,0,0), 5000, make_shared<dielectric>(1.5));
-    world.add(make_shared<constant_medium>(boundary, .0001, color(1,1,1)));
+    auto pertext = new noise_texture(0.2, local_rand_state);
+    d_list[i++] = new sphere(point3(220,280,300), 80, new lambertian(pertext));
 
-    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
-    world.add(make_shared<sphere>(point3(400,200,400), 100, checker));
-    auto pertext = make_shared<noise_texture>(0.2);
-    world.add(make_shared<sphere>(point3(220,280,300), 80, make_shared<lambertian>(pertext)));
-
-    hittable_list boxes2;
-    auto white = make_shared<lambertian>(color(.73, .73, .73));
     int ns = 1000;
     for (int j = 0; j < ns; j++) {
-        boxes2.add(make_shared<sphere>(point3::random(0,165), 10, white));
+        auto position = point3::random(local_rand_state,0,165) + point3(-100, 270, 395);
+        point3 position1 = point3(position.x(), position.y(), position.z());
+        d_list[i++] = new sphere(position1, 10, new lambertian(color(.73, .73, .73)));
     }
 
-    world.add(make_shared<translate>(
-        make_shared<rotate_y>(
-            make_shared<bvh_node>(boxes2), 15),
-            vec3(-100,270,395)
-        )
-    );
+    *d_world = new hittable_list(d_list, i);
 
-    // Light Sources
-    auto empty_material = shared_ptr<material>();
-    hittable_list lights;
-    lights.add(make_shared<quad>(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), empty_material));
-    
-    camera renderer;
-
-    renderer.aspect_ratio      = aspect_ratio;
-    renderer.image_width       = image_width;
-    renderer.samples_per_pixel = samples_per_pixel;
-    renderer.max_depth         = max_depth;
-    renderer.background        = color(0,0,0);
-    renderer.use_openmp        = use_openmp;
-    renderer.num_threads       = num_threads;
-    renderer.filename          = filename;
-
-    renderer.vfov     = 40;
-    renderer.lookfrom = point3(478, 278, -600);
-    renderer.lookat   = point3(278, 278, 0);
-    renderer.vup      = vec3(0,1,0);
-
-    renderer.defocus_angle = 0;
-
-    renderer.render(world, lights);
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(478, 278, -600), point3(278, 278, 0),
+                      vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
 
-int main() {
-    // Scene selection
-    int scene = 2;         
-
-    // Acceleration technique selection
-    bool use_openmp = true;
-    int num_threads = 16;
-
-    // Hyperparameters
-    int image_width = 1000;               // Rendered image width in pixel count
-    float aspect_ratio = 1.0;            // Ratio of image width over height
-    int samples_per_pixel = 100;          // Count of random samples for each pixel
-    int max_depth = 50;                   // Maximum number of ray bounces into scene
-    std::string filename = "test.ppm";    // Output file name
-
-    auto startTime = std::chrono::high_resolution_clock::now();
-    switch (scene) {
-        case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
-        case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
-        case 3:  cornell_smoke(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);   break;
-        default: final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename);     break;
+__global__ void free_world(hittable **d_list, hittable_list **d_world, camera **d_camera)
+{
+    for (int i = 0; i < (*d_world)->obj_num; i++)
+    {
+        if (d_list[i]->get_type() == HittableType::SPHERE) {
+            delete ((sphere*)d_list[i])->get_mat();     
+        } else if (d_list[i]->get_type() == HittableType::QUAD) {
+            delete ((quad*)d_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+            delete ((constant_medium*)d_list[i])->get_mat();          
+        }
+        delete d_list[i];
     }
-    auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<float> duration = endTime - startTime;
+    delete *d_world;
+    delete *d_camera;
+}
 
-    std::clog << "Overall Rendering Time: " << std::fixed << std::setprecision(4) << duration.count() << " seconds\n"; 
+__global__ void call_render(hittable_list **d_world, camera **cam, int image_width, int image_height, uint8_t *output,
+                            curandState *devStates)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    if ((i >= image_width) || (j >= image_height))
+        return;
+
+    curandState *local_rand_state = &devStates[j * image_width + i];
+
+    (*cam)->render(d_world, i, j, local_rand_state, output);
+}
+
+__global__ void rand_init(curandState *rand_state, unsigned long seed) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        curand_init(seed, 0, 0, rand_state);
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    int image_width = 1080;
+    int image_height = 720;
+    int samples_per_pixel = 20000;
+    int max_depth = 100;
+    int scene = 3;
+    bool use_bvh = false; // TODO: Fix the dynamic memory allocation problems
+
+    int total_pixels = image_width * image_height;
+
+    // Parsing input arguments
+    if (argc > 1) {
+        scene = std::atoi(argv[1]); 
+        samples_per_pixel = std::atoi(argv[2]); 
+        max_depth = std::atoi(argv[3]); 
+        use_bvh = std::string(argv[4]) == "true";
+    }
+
+    std::clog << "Start Rendering scene " << scene << " with " << total_pixels << " pixels on GPU with CUDA...      \n";
+    std::clog << "samples_per_pixel: " << samples_per_pixel << " \n";
+    std::clog << "max_depth: " << max_depth << " \n";
+    std::clog << "use_bvh: " << use_bvh << " \n";
+
+    curandState *devStates;
+    checkCudaErrors(cudaMalloc((void **)&devStates, total_pixels * sizeof(curandState)));
+    curandState *d_rand_state;
+    checkCudaErrors(cudaMalloc((void **)&d_rand_state, 1*sizeof(curandState)));
+
+    hittable **d_list;
+    checkCudaErrors(cudaMalloc((void **)&d_list, MAX_OBJS * sizeof(hittable *)));
+    hittable_list **d_world;
+    checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hittable_list *)));
+    uint8_t *d_output;
+    checkCudaErrors(cudaMalloc((void **)&d_output, total_pixels * 3 * sizeof(uint8_t)));
+    camera **cam;
+    checkCudaErrors(cudaMalloc((void **)&cam, sizeof(camera)));
+
+    int blockdimx = 16;
+    int blockdimy = 16;
+    dim3 gridSize((image_width + blockdimx - 1) / blockdimx, (image_height + blockdimy - 1) / blockdimy);
+    dim3 blockSize(blockdimx, blockdimy);
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    unsigned long seed = 1984;
+    rand_init<<<1, 1>>>(d_rand_state, seed);
+    init_random_state<<<gridSize, blockSize>>>(devStates, image_width, image_height, seed);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    switch (scene) {
+        case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+    }
+    
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    call_render<<<gridSize, blockSize>>>(d_world, cam, image_width, image_height, d_output, devStates);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto render_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    float total_time = render_time.count();
+    float avg_time_per_pixel = total_time / static_cast<float>(total_pixels);
+    float avg_time_per_row = total_time / static_cast<float>(image_height);
+
+    std::clog << "Total render time (ms): " << total_time << "\n";
+    std::clog << "Average time per row (ms): " << avg_time_per_row << "\n";
+    std::clog << "Average time per pixel (ms): " << avg_time_per_pixel << "\n";
+
+    uint8_t *h_output = new uint8_t[image_width * image_height * 3];
+    checkCudaErrors(
+        cudaMemcpy(h_output, d_output, image_width * image_height * 3 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+
+    std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
+    for (int i = 0; i < image_height; i++)
+    { // Row
+        std::clog << "\rScanlines remaining: " << (image_height - 1) << " " << std::flush;
+        for (int j = 0; j < image_width; j++)
+        { // Column
+            int start_write_index = 3 * (i * image_width + j);
+            write_color(std::cout, h_output[start_write_index], h_output[start_write_index + 1],
+                        h_output[start_write_index + 2]);
+        }
+    }
+
+    std::clog << "\rDone.                   \n";
+
+    checkCudaErrors(cudaDeviceSynchronize());
+    free_world<<<1, 1>>>(d_list, d_world, cam);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaFree(d_list));
+    checkCudaErrors(cudaFree(d_world));
+    checkCudaErrors(cudaFree(devStates));
+    checkCudaErrors(cudaFree(d_output));
+    checkCudaErrors(cudaFree(cam));
+    cudaDeviceReset();
+    delete[] h_output;
 }
