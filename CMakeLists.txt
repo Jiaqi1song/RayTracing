@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------------------------
-# CMake Build Configuration for Ray Tracing for CPU and GPU
+# CMake Build Configuration for Ray Tracing on CPU and GPU
 #---------------------------------------------------------------------------------------------------
 
 cmake_minimum_required ( VERSION 3.10.0...3.27.0 )

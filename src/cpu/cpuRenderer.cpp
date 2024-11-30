@@ -252,7 +252,11 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
 
     hittable_list world;
 
-    world.add(make_shared<bvh_node>(boxes1));
+    if (use_bvh) {
+        world.add(make_shared<bvh_node>(boxes1));
+    } else {
+        world.add(make_shared<hittable_list>(boxes1));
+    }
 
     auto light = make_shared<diffuse_light>(color(15, 15, 15));
     world.add(make_shared<quad>(point3(123,554,147), vec3(300,0,0), vec3(0,0,265), light));
@@ -273,7 +277,7 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     boundary = make_shared<sphere>(point3(0,0,0), 5000, make_shared<dielectric>(1.5));
     world.add(make_shared<constant_medium>(boundary, .0001, color(1,1,1)));
 
-    auto emat = make_shared<lambertian>(make_shared<image_texture>("resource/earthmap.jpg"));
+    auto emat = make_shared<lambertian>(make_shared<solid_color>(.8, .1, .1));
     world.add(make_shared<sphere>(point3(400,200,400), 100, emat));
     auto pertext = make_shared<noise_texture>(0.2);
     world.add(make_shared<sphere>(point3(220,280,300), 80, make_shared<lambertian>(pertext)));
@@ -285,12 +289,21 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
         boxes2.add(make_shared<sphere>(point3::random(0,165), 10, white));
     }
 
-    world.add(make_shared<translate>(
-        make_shared<rotate_y>(
-            make_shared<bvh_node>(boxes2), 15),
-            vec3(-100,270,395)
-        )
-    );
+    if (use_bvh) {
+        world.add(make_shared<translate>(
+            make_shared<rotate_y>(
+                make_shared<bvh_node>(boxes2), 15),
+                vec3(-100,270,395)
+            )
+        );
+    } else {
+        world.add(make_shared<translate>(
+            make_shared<rotate_y>(
+                make_shared<hittable_list>(boxes2), 15),
+                vec3(-100,270,395)
+            )
+        );
+    }
 
     // If use BVH to accelrate the rendering process
     if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
@@ -345,6 +358,7 @@ int main(int argc, char* argv[]) {
 
     // Hyperparameters
     int image_width = 600;               // Rendered image width in pixel count
+    int image_height = 600;
     double aspect_ratio = 16.0 / 9.0;     // Ratio of image width over height
     int samples_per_pixel = 200;          // Count of random samples for each pixel
     int max_depth = 30;                   // Maximum number of ray bounces into scene
@@ -361,6 +375,9 @@ int main(int argc, char* argv[]) {
         use_bvh = std::string(argv[7]) == "true";
         num_threads = std::atoi(argv[8]);
         critical_section = std::string(argv[9]) == "true";
+        image_width = std::atoi(argv[10]);
+        image_height = std::atoi(argv[11]);
+        aspect_ratio = double(image_width) / double(image_height);
     }
 
     std::clog << "samples_per_pixel: " << samples_per_pixel << " \n";
@@ -370,7 +387,7 @@ int main(int argc, char* argv[]) {
     std::clog << "use_bvh: " << use_bvh << " \n";
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    if (animation_method == 2) {
+    if (animation && animation_method == 2) {
         int total_frame = 20;
         for (int frame = 0; frame < total_frame; ++frame) {
             first_scene_moving(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method, total_frame, frame);
@@ -384,7 +401,11 @@ int main(int argc, char* argv[]) {
     }
     
     auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = endTime - startTime;
+    auto render_time = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    double total_time = render_time.count();
+    double avg_time_per_pixel = total_time / static_cast<double>(image_width * image_height);
 
-    std::clog << "Overall Rendering Time: " << std::fixed << std::setprecision(4) << duration.count() << " seconds\n"; 
+    std::clog << "Total render time (ms): " << total_time << "\n";
+    std::clog << "Average time per pixel (ms): " << avg_time_per_pixel << "\n";
+    std::clog << "\rDone.                   \n";
 }
