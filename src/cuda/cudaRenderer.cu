@@ -152,8 +152,8 @@ __global__ void create_world3(hittable **d_list, hittable_list **d_world, camera
     boundary = new sphere(point3(0,0,0), 5000, new dielectric(1.5));
     d_list[i++] = new constant_medium(boundary, .0001, color(1,1,1));
 
-    auto checker = new checker_texture(0.32, color(.8, .1, .1), color(.9, .9, .9));
-    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(checker));
+    auto tmat = new solid_color(.8, .1, .1);
+    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(tmat));
 
     auto pertext = new noise_texture(0.2, local_rand_state);
     d_list[i++] = new sphere(point3(220,280,300), 80, new lambertian(pertext));
