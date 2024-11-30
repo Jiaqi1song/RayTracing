@@ -22,7 +22,7 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 - [ ] BVH acceleration on CUDA 
 - [ ] Animation
 
-## Compile and run the ray tracer (modify the parameters in the render.sh script)
+## Compile and run the ray tracer (modify the parameters in the script)
 
 ```bash
 bash render.sh

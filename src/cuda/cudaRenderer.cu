@@ -217,16 +217,17 @@ int main(int argc, char* argv[])
     int scene = 3;
     bool use_bvh = false; // TODO: Fix the dynamic memory allocation problems
 
-    int total_pixels = image_width * image_height;
-
     // Parsing input arguments
     if (argc > 1) {
         scene = std::atoi(argv[1]); 
         samples_per_pixel = std::atoi(argv[2]); 
         max_depth = std::atoi(argv[3]); 
         use_bvh = std::string(argv[4]) == "true";
+        image_width = std::atoi(argv[5]);
+        image_height = std::atoi(argv[6]);
     }
 
+    int total_pixels = image_width * image_height;
     std::clog << "Start Rendering scene " << scene << " with " << total_pixels << " pixels on GPU with CUDA...      \n";
     std::clog << "samples_per_pixel: " << samples_per_pixel << " \n";
     std::clog << "max_depth: " << max_depth << " \n";
@@ -276,10 +277,8 @@ int main(int argc, char* argv[])
     auto render_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     float total_time = render_time.count();
     float avg_time_per_pixel = total_time / static_cast<float>(total_pixels);
-    float avg_time_per_row = total_time / static_cast<float>(image_height);
 
     std::clog << "Total render time (ms): " << total_time << "\n";
-    std::clog << "Average time per row (ms): " << avg_time_per_row << "\n";
     std::clog << "Average time per pixel (ms): " << avg_time_per_pixel << "\n";
 
     uint8_t *h_output = new uint8_t[image_width * image_height * 3];
@@ -289,7 +288,6 @@ int main(int argc, char* argv[])
     std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
     for (int i = 0; i < image_height; i++)
     { // Row
-        std::clog << "\rScanlines remaining: " << (image_height - 1) << " " << std::flush;
         for (int j = 0; j < image_width; j++)
         { // Column
             int start_write_index = 3 * (i * image_width + j);
