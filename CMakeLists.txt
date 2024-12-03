@@ -11,9 +11,10 @@ set ( CMAKE_CXX_STANDARD          17 )
 set ( CMAKE_CXX_STANDARD_REQUIRED ON )
 set ( CMAKE_CXX_EXTENSIONS        ON )
 
-# RTX 2080: Turing architecture (75) 
-# RTX 3060: Ampere architecture (86)
-set(CMAKE_CUDA_ARCHITECTURES 75 86 )
+# NVIDIA RTX 2080: Turing architecture (75) 
+# NVIDIA RTX 3060: Ampere architecture (86)
+# Tesla V100:       Volta architecture (70)
+set(CMAKE_CUDA_ARCHITECTURES 70 75 86 )
 
 # Source
 set ( CPURENDERER
@@ -37,11 +38,13 @@ set ( CPURENDERER
   src/cpu/sphere.h
   src/cpu/texture.h
   src/cpu/vec3.h
+  src/cpu/bvh.h
 )
 
 set ( GPURENDERER
   src/cuda/cudaRenderer.cu
   src/cuda/aabb.h
+  src/cuda/bvh.h
   src/cuda/camera.h
   src/cuda/color.h
   src/cuda/constant_medium.h
@@ -54,6 +57,8 @@ set ( GPURENDERER
   src/cuda/sphere.h
   src/cuda/texture.h
   src/cuda/vec.h
+  src/cuda/onb.h
+  src/cuda/pdf.h
 )
 
 include_directories(src)

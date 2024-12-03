@@ -41,7 +41,7 @@ __device__ float random_float(curandState *state, float min, float max)
 
 __device__  int random_int(int min, int max, curandState *state) {
     // Returns a random integer in [min,max].
-    return int(random_float(state, float(min), float(max+1)));
+    return int(random_float(state, float(min), float(max)));
 }
 
 class vec_base
@@ -198,6 +198,18 @@ __device__ inline vec3 refract(const vec3 &v, const vec3 &n, float eta)
     vec3 r_out_perp = eta * (v + cos_theta * n);
     vec3 r_out_parallel = -sqrtf(fabsf(1.0f - r_out_perp.length_squared())) * n;
     return r_out_perp + r_out_parallel;
+}
+
+__device__ inline vec3 random_cosine_direction(curandState *state) {
+    auto r1 = random_float(state);
+    auto r2 = random_float(state);
+
+    auto phi = 2*PI*r1;
+    auto x = cosf(phi) * sqrtf(r2);
+    auto y = sinf(phi) * sqrtf(r2);
+    auto z = sqrtf(1-r2);
+
+    return vec3(x, y, z);
 }
 
 class point3 : public vec_base

@@ -3,12 +3,13 @@
 #include "texture.h"
 #include "quad.h"
 #include "constant_medium.h"
-// #include "bvh.h"
+#include "bvh.h"
 
 #include <chrono>
 #include <cstdlib>
 
 #define MAX_OBJS 4000
+#define MAX_LIGHT_SOURCE 10
 
 #define checkCudaErrors(val) check_cuda((val), #val, __FILE__, __LINE__)
 
@@ -24,7 +25,7 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__global__ void create_world1(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world1(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {
     curandState *local_rand_state = &devStates[0];
@@ -65,15 +66,28 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(-4.0f, 1.0f, 0.0f), 1.0f, new lambertian(color(0.4f, 0.2f, 0.1f)));
     d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
-    *d_world = new hittable_list(d_list, i);
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
 
+    // Light Sources
+    int j = 0;
+    d_light_list[j++] = new sphere(point3(0,-1000,0), 1, new material());
+    d_light_list[j++] = new sphere(point3(0,-1000,0), 2, new material());
+    *d_lights = new hittable_list(d_light_list, j);
+    
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 20.0f, point3(13.0f, 2.0f, 3.0f), point3(0.0f, 0.0f, 0.0f),
                       vec3(0.0f, 1.0f, 0.0f), 0.6f, 10.0f, color(0.70, 0.80, 1.00));
 }
 
-__global__ void create_world2(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world2(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
-{
+{   
+    curandState *local_rand_state = &devStates[0];
+
     // Cornell box sides
     int i = 0;
     d_list[i++] = new quad(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), new lambertian(color(.12, .45, .15)));
@@ -97,13 +111,24 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
     // Glass Sphere
     d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
     
-    *d_world = new hittable_list(d_list, i);
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
+
+    // Light Sources
+    int j = 0; 
+    d_light_list[j++] = new quad(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), new material());
+    d_light_list[j++] = new sphere(point3(190, 90, 190), 90, new material());
+    *d_lights = new hittable_list(d_light_list, j);
 
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(278.0f, 278.0f, -800.0f), point3(278.0f, 278.0f, 0.0f),
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
-__global__ void create_world3(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {
     curandState *local_rand_state = &devStates[0];
@@ -165,14 +190,24 @@ __global__ void create_world3(hittable **d_list, hittable_list **d_world, camera
         d_list[i++] = new sphere(position1, 10, new lambertian(color(.73, .73, .73)));
     }
 
-    *d_world = new hittable_list(d_list, i);
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
+
+    // Light Sources
+    int j = 0; 
+    d_light_list[j++] = new quad(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), new material());
+    *d_lights = new hittable_list(d_light_list, j);
 
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(478, 278, -600), point3(278, 278, 0),
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
 
-__global__ void free_world(hittable **d_list, hittable_list **d_world, camera **d_camera)
+__global__ void free_world(hittable **d_list, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **d_camera)
 {
     for (int i = 0; i < (*d_world)->obj_num; i++)
     {
@@ -185,11 +220,25 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, camera **
         }
         delete d_list[i];
     }
+
+    for (int i = 0; i < (*d_lights)->obj_num; i++)
+    {
+        if (d_light_list[i]->get_type() == HittableType::SPHERE) {
+            delete ((sphere*)d_light_list[i])->get_mat();     
+        } else if (d_light_list[i]->get_type() == HittableType::QUAD) {
+            delete ((quad*)d_light_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+            delete ((constant_medium*)d_light_list[i])->get_mat();          
+        }
+        delete d_light_list[i];
+    }
+
+    delete *d_lights;
     delete *d_world;
     delete *d_camera;
 }
 
-__global__ void call_render(hittable_list **d_world, camera **cam, int image_width, int image_height, uint8_t *output,
+__global__ void call_render(hittable_list **d_world, hittable_list **d_lights, camera **cam, int image_width, int image_height, uint8_t *output,
                             curandState *devStates)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -199,7 +248,7 @@ __global__ void call_render(hittable_list **d_world, camera **cam, int image_wid
 
     curandState *local_rand_state = &devStates[j * image_width + i];
 
-    (*cam)->render(d_world, i, j, local_rand_state, output);
+    (*cam)->render(d_world, d_lights, i, j, local_rand_state, output);
 }
 
 __global__ void rand_init(curandState *rand_state, unsigned long seed) {
@@ -238,10 +287,19 @@ int main(int argc, char* argv[])
     curandState *d_rand_state;
     checkCudaErrors(cudaMalloc((void **)&d_rand_state, 1*sizeof(curandState)));
 
+    BVH_Node *bvh_data;
+    checkCudaErrors(cudaMalloc((void **)&bvh_data, MAX_OBJS * sizeof(BVH_Node)));
+    
     hittable **d_list;
     checkCudaErrors(cudaMalloc((void **)&d_list, MAX_OBJS * sizeof(hittable *)));
+    hittable **d_light_list;
+    checkCudaErrors(cudaMalloc((void **)&d_light_list, MAX_LIGHT_SOURCE * sizeof(hittable *)));
+
     hittable_list **d_world;
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hittable_list *)));
+    hittable_list **d_lights;
+    checkCudaErrors(cudaMalloc((void **)&d_lights, sizeof(hittable_list *)));
+
     uint8_t *d_output;
     checkCudaErrors(cudaMalloc((void **)&d_output, total_pixels * 3 * sizeof(uint8_t)));
     camera **cam;
@@ -252,8 +310,6 @@ int main(int argc, char* argv[])
     dim3 gridSize((image_width + blockdimx - 1) / blockdimx, (image_height + blockdimy - 1) / blockdimy);
     dim3 blockSize(blockdimx, blockdimy);
 
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     unsigned long seed = 1984;
     rand_init<<<1, 1>>>(d_rand_state, seed);
     init_random_state<<<gridSize, blockSize>>>(devStates, image_width, image_height, seed);
@@ -261,15 +317,17 @@ int main(int argc, char* argv[])
     checkCudaErrors(cudaDeviceSynchronize());
 
     switch (scene) {
-        case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
-        case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
-        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 1: create_world1<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 2: create_world2<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
     }
     
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
-    call_render<<<gridSize, blockSize>>>(d_world, cam, image_width, image_height, d_output, devStates);
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    call_render<<<gridSize, blockSize>>>(d_world, d_lights, cam, image_width, image_height, d_output, devStates);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
@@ -299,7 +357,7 @@ int main(int argc, char* argv[])
     std::clog << "\rDone.                   \n";
 
     checkCudaErrors(cudaDeviceSynchronize());
-    free_world<<<1, 1>>>(d_list, d_world, cam);
+    free_world<<<1, 1>>>(d_list, d_world, d_light_list, d_lights, cam);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaFree(d_list));
     checkCudaErrors(cudaFree(d_world));

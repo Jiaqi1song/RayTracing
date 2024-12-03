@@ -33,6 +33,10 @@ public:
     __device__ virtual bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const = 0;
     __device__ virtual aabb bounding_box() const = 0;
     __device__ virtual HittableType get_type() const = 0; 
+    __device__ virtual float pdf_value(const point3& origin, const vec3& direction, curandState *state) const { return 0.0;}
+    __device__ virtual vec3 random(const point3& origin, curandState *state) const {return vec3(1,0,0);}
+    aabb bbox;
+    bool is_bvh = false;
 };
 
 class hittable_list : public hittable
@@ -42,7 +46,8 @@ public:
     int obj_num;
 
     __device__ hittable_list(hittable **objects, int obj_num) : objects(objects), obj_num(obj_num) 
-    {
+    {   
+        bbox = aabb::empty();
         for (int i = 0; i < obj_num; ++i)
         {
             bbox = aabb(bbox, objects[i]->bounding_box());
@@ -70,9 +75,23 @@ public:
         return hit_anything;
     }
 
+    __device__ float pdf_value(const point3& origin, const vec3& direction, curandState *state) const override {
+        auto weight = 1.0 / obj_num;
+        auto sum = 0.0;
+
+        for (int i = 0; i < obj_num; ++i) {
+            sum += weight * objects[i]->pdf_value(origin, direction, state);
+        }
+
+        return sum;
+    }
+
+    __device__ vec3 random(const point3& origin, curandState *state) const override {
+        return objects[random_int(0, obj_num-1, state)]->random(origin, state);
+    }
+
     __device__ aabb bounding_box() const override { return bbox; }
 
-private:
     aabb bbox;
 };
 

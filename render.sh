@@ -5,13 +5,13 @@ cmake -B build
 cmake --build build 
 
 # Set render to "cpu" for CPU ray tracer or "cuda" for CUDA ray tracer.
-render=cpu
+render=cuda
 
 # Select the scene
 #   1: first_scene
 #   2: cornell_box
 #   3: final_scene
-scene=1
+scene=2
 
 # Image size
 image_width=600
@@ -32,11 +32,11 @@ num_threads=8;
 critical_section=false;
 
 # Select if use BVH for CPU or CUDA (only support on CPU now)
-use_bvh=falase;
+use_bvh=false;
 
 # Number of sample and depth
-samples_per_pixel=200
-max_depth=20
+samples_per_pixel=10000
+max_depth=200
 
 if [ "$render" = "cpu" ]; then
     echo "Running CPU Ray Tracer..."
