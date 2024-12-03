@@ -74,28 +74,26 @@ public:
 
     __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState* state) const override {
         
-        StaticStack<hittable*, 16> stack;
+        StaticStack<hittable*, 32> stack;
         hittable* root = (hittable*) this;
         stack.push(root);
 
         bool hit_anything = false;
-        interval closest_t = ray_t;
-
-        if (!root->bbox.hit(r, closest_t)) return false;
+        interval closest_so_far = ray_t;
 
         while (!stack.empty()) {
             hittable* current = stack.pop();
-            if (!current->bbox.hit(r, closest_t))
+            if (!current->bbox.hit(r, closest_so_far))
                 continue;
 
             if (current->get_type() == HittableType::BVH) {
                 bvh_node* node = (bvh_node*) current;
-                stack.push(node->right);
-                stack.push(node->left);
+                if (node->right) stack.push(node->right);
+                if (node->left) stack.push(node->left);
             } else {
-                if (current->hit(r, closest_t, rec, state)) {
+                if (current->hit(r, closest_so_far, rec, state)) {
                     hit_anything = true;
-                    closest_t.max = rec.t;          
+                    closest_so_far.max = rec.t;
                 }
             }
         }
@@ -103,7 +101,7 @@ public:
         return hit_anything;
     }
 
-    __device__ friend hittable* build_bvh_node(hittable** objects, size_t object_count);
+    __device__ friend hittable* build_bvh_node(hittable** objects, size_t object_count, curandState* state);
 
     __device__ aabb bounding_box() const override { return bbox; }
 
@@ -133,7 +131,7 @@ __device__ static bool box_z_compare(const hittable* a, const hittable* b) {
     return box_compare(a, b, 2);
 }
 
-__device__ hittable* build_bvh_node(hittable** objects, size_t object_count) {
+__device__ hittable* build_bvh_node(hittable** objects, size_t object_count, curandState* state) {
 
     DynamicStack<BVH_Node> stack(4000);
     
@@ -144,7 +142,6 @@ __device__ hittable* build_bvh_node(hittable** objects, size_t object_count) {
         BVH_Node current = stack.pop();
         bvh_node* current_node = (bvh_node*)current.node;
 
-        
         size_t start = current.start;
         size_t end = current.end;
         size_t object_span = end - start;
@@ -164,7 +161,7 @@ __device__ hittable* build_bvh_node(hittable** objects, size_t object_count) {
             int axis = current_node->bbox.longest_axis();
             auto comparator = (axis == 0) ? box_x_compare
                             : (axis == 1) ? box_y_compare
-                                            : box_z_compare;
+                                          : box_z_compare;
 
             thrust::sort(objects + start, objects + end, comparator);
 

@@ -66,7 +66,7 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i);
+        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -78,7 +78,9 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
 
 __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
-{
+{   
+    curandState *local_rand_state = &devStates[0];
+    
     // Cornell box sides
     int i = 0;
     d_list[i++] = new quad(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), new lambertian(color(.12, .45, .15)));
@@ -103,7 +105,7 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i);
+        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -176,7 +178,7 @@ __global__ void create_world3(hittable **d_list, hittable_list **d_world, camera
     }
 
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i);
+        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
