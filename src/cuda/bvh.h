@@ -4,6 +4,7 @@
 #include "aabb.h"
 #include "hittable.h"
 #include <thrust/sort.h>
+#include <thrust/device_ptr.h>
 
 struct BVH_Node {
     hittable* node;
@@ -15,9 +16,9 @@ struct BVH_Node {
 template <typename T>
 class DynamicStack {
 public:
-    __device__ DynamicStack(int capacity)
+    __device__ DynamicStack(T* data, int capacity)
         : capacity_(capacity), size_(0) {
-        data_ = (T*)(malloc(sizeof(T) * capacity));
+        data_ = data;
     }
 
     __device__ ~DynamicStack() {
@@ -68,13 +69,13 @@ private:
 
 class bvh_node : public hittable {
 public:
-    __device__ bvh_node() : left(nullptr), right(nullptr) {}
+    __device__ bvh_node() : left(nullptr), right(nullptr) { is_bvh = true; }
 
     __device__ HittableType get_type() const override { return HittableType::BVH; }
 
     __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState* state) const override {
         
-        StaticStack<hittable*, 32> stack;
+        StaticStack<hittable*, 16> stack;
         hittable* root = (hittable*) this;
         stack.push(root);
 
@@ -86,10 +87,10 @@ public:
             if (!current->bbox.hit(r, closest_so_far))
                 continue;
 
-            if (current->get_type() == HittableType::BVH) {
+            if (current->is_bvh) {
                 bvh_node* node = (bvh_node*) current;
-                if (node->right) stack.push(node->right);
-                if (node->left) stack.push(node->left);
+                stack.push(node->right);
+                stack.push(node->left);
             } else {
                 if (current->hit(r, closest_so_far, rec, state)) {
                     hit_anything = true;
@@ -101,7 +102,7 @@ public:
         return hit_anything;
     }
 
-    __device__ friend hittable* build_bvh_node(hittable** objects, size_t object_count, curandState* state);
+    __device__ friend hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state);
 
     __device__ aabb bounding_box() const override { return bbox; }
 
@@ -131,9 +132,9 @@ __device__ static bool box_z_compare(const hittable* a, const hittable* b) {
     return box_compare(a, b, 2);
 }
 
-__device__ hittable* build_bvh_node(hittable** objects, size_t object_count, curandState* state) {
+__device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state) {
 
-    DynamicStack<BVH_Node> stack(4000);
+    DynamicStack<BVH_Node> stack(bvh_data, 4000);
     
     bvh_node* root = new bvh_node();
     stack.push(BVH_Node{ root, 0, object_count });
@@ -163,7 +164,8 @@ __device__ hittable* build_bvh_node(hittable** objects, size_t object_count, cur
                             : (axis == 1) ? box_y_compare
                                           : box_z_compare;
 
-            thrust::sort(objects + start, objects + end, comparator);
+            thrust::device_ptr<hittable*> dev_ptr(objects);
+            thrust::sort(dev_ptr + start, dev_ptr + end, comparator);
 
             size_t mid = start + object_span / 2;
             bvh_node* left_child = new bvh_node();

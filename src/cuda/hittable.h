@@ -34,6 +34,7 @@ public:
     __device__ virtual aabb bounding_box() const = 0;
     __device__ virtual HittableType get_type() const = 0; 
     aabb bbox;
+    bool is_bvh = false;
 };
 
 class hittable_list : public hittable

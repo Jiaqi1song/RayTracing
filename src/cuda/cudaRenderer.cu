@@ -24,7 +24,7 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__global__ void create_world1(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world1(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {
     curandState *local_rand_state = &devStates[0];
@@ -66,7 +66,7 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -76,11 +76,11 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
                       vec3(0.0f, 1.0f, 0.0f), 0.6f, 10.0f, color(0.70, 0.80, 1.00));
 }
 
-__global__ void create_world2(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world2(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {   
     curandState *local_rand_state = &devStates[0];
-    
+
     // Cornell box sides
     int i = 0;
     d_list[i++] = new quad(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), new lambertian(color(.12, .45, .15)));
@@ -105,7 +105,7 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -115,7 +115,7 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
-__global__ void create_world3(hittable **d_list, hittable_list **d_world, camera **cam, int image_width,
+__global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {
     curandState *local_rand_state = &devStates[0];
@@ -178,7 +178,7 @@ __global__ void create_world3(hittable **d_list, hittable_list **d_world, camera
     }
 
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, i, local_rand_state);
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -257,8 +257,11 @@ int main(int argc, char* argv[])
 
     hittable **d_list;
     checkCudaErrors(cudaMalloc((void **)&d_list, MAX_OBJS * sizeof(hittable *)));
+    BVH_Node *bvh_data;
+    checkCudaErrors(cudaMalloc((void **)&bvh_data, MAX_OBJS * sizeof(BVH_Node)));
     hittable_list **d_world;
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hittable_list *)));
+
     uint8_t *d_output;
     checkCudaErrors(cudaMalloc((void **)&d_output, total_pixels * 3 * sizeof(uint8_t)));
     camera **cam;
@@ -276,9 +279,9 @@ int main(int argc, char* argv[])
     checkCudaErrors(cudaDeviceSynchronize());
 
     switch (scene) {
-        case 1: create_world1<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
-        case 2: create_world2<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
-        case 3: create_world3<<<1, 1>>>(d_list, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 1: create_world1<<<1, 1>>>(d_list, bvh_data, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 2: create_world2<<<1, 1>>>(d_list, bvh_data, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, bvh_data, d_world, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
     }
     
     checkCudaErrors(cudaGetLastError());
