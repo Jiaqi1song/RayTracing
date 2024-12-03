@@ -58,7 +58,7 @@ class camera
         color final_color{0.0f, 0.0f, 0.0f};
 
         int depth = 0;
-        hittable_pdf light_pdf;
+        hittable_pdf light_pdf = hittable_pdf();
         light_pdf.objects = (*lights)->objects;
         light_pdf.obj_num = (*lights)->obj_num;
 
@@ -77,10 +77,12 @@ class camera
                         cur_ray = srec.skip_pdf_ray;
                         continue;
                     } 
-
+                    
                     light_pdf.origin = rec.hit_point;
 
-                    mixture_pdf mixed_pdf(&light_pdf, srec.next_pdf);
+                    pdf *next_pdf_ptr = srec.get_next_pdf_ptr();
+
+                    mixture_pdf mixed_pdf(&light_pdf, next_pdf_ptr);
                     vec3 scatter_direction = mixed_pdf.generate(state);
                     ray scattered = ray(rec.hit_point, scatter_direction);
 

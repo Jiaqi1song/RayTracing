@@ -11,7 +11,7 @@ render=cuda
 #   1: first_scene
 #   2: cornell_box
 #   3: final_scene
-scene=1
+scene=2
 
 # Image size
 image_width=600

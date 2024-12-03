@@ -29,7 +29,10 @@ class sphere_pdf : public pdf {
 
 class cosine_pdf : public pdf {
   public:
-    __device__ cosine_pdf(const vec3& w) : uvw(w) {}
+    __device__ cosine_pdf() {}
+    __device__ cosine_pdf(const vec3& w) {
+      uvw.build(w);
+    }
 
     __device__ float value(const vec3& direction, curandState *state) const override {
         auto cosine_theta = dot(unit_vector(direction), uvw.w());
@@ -41,7 +44,7 @@ class cosine_pdf : public pdf {
     }
 
   private:
-    onb uvw = onb(vec3(0,0,0));
+    onb uvw;
 };
 
 
@@ -105,6 +108,21 @@ class mixture_pdf : public pdf {
   private:
     pdf *p_0;
     pdf *p_1;
+};
+
+enum class pdf_type{
+  UNKNOW,
+  SPHERE,
+  COSINE,
+};
+
+struct dynamic_pdf {
+  __device__ dynamic_pdf(): type{pdf_type::UNKNOW}{}
+
+  pdf_type type = pdf_type::UNKNOW;
+  sphere_pdf sphere;
+  cosine_pdf cosine;
+  pdf empty_pdf;
 };
 
 #endif

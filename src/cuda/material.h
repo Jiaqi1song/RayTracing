@@ -6,12 +6,22 @@
 #include "texture.h"
 #include "pdf.h"
 
-class scatter_record {
-public:
+struct scatter_record {
     color attenuation;
     bool skip_pdf;
-    pdf *next_pdf;
     ray skip_pdf_ray;
+
+    dynamic_pdf next_pdf;
+
+    __device__ pdf* get_next_pdf_ptr() {
+        if(next_pdf.type == pdf_type::SPHERE){
+            return (pdf*)&(next_pdf.sphere);
+        }
+        if(next_pdf.type == pdf_type::COSINE){
+            return (pdf*)&(next_pdf.cosine);
+        }
+        return nullptr;
+    } 
 };
 
 class material
@@ -35,7 +45,9 @@ public:
     __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override 
     {
         srec.attenuation = tex->value(rec.u, rec.v, rec.hit_point);
-        srec.next_pdf = new cosine_pdf(rec.normal_vector);
+        srec.next_pdf.type = pdf_type::COSINE;
+        srec.next_pdf.cosine = cosine_pdf(rec.normal_vector);
+
         srec.skip_pdf = false;
         return true;
     }
@@ -62,7 +74,9 @@ public:
 
         srec.attenuation = albedo;
         srec.skip_pdf = true;
-        srec.next_pdf = nullptr;
+        srec.next_pdf.type = pdf_type::UNKNOW;
+        srec.next_pdf.empty_pdf = pdf();
+
         srec.skip_pdf_ray = ray(rec.hit_point, reflected);
 
         return true;
@@ -88,7 +102,9 @@ public:
     __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override {
         srec.attenuation = color(1.0, 1.0, 1.0);
         srec.skip_pdf = true;
-        srec.next_pdf = nullptr;
+        srec.next_pdf.type = pdf_type::UNKNOW;
+        srec.next_pdf.empty_pdf = pdf();
+
         float ri = rec.front_face ? (1.0/refraction_index) : refraction_index;
 
         vec3 unit_direction = unit_vector(r_in.direction());
@@ -133,7 +149,9 @@ class isotropic : public material {
     __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override 
     {
         srec.attenuation = tex->value(rec.u, rec.v, rec.hit_point);
-        srec.next_pdf = new sphere_pdf();
+        srec.next_pdf.type = pdf_type::SPHERE;
+        srec.next_pdf.sphere = sphere_pdf();
+
         srec.skip_pdf = false;
         return true;
     }

@@ -4,7 +4,16 @@
 
 class onb {
   public:
+    __device__ onb() {}
+
     __device__ onb(const vec3& n) {
+        axis3 = unit_vector(n);
+        vec3 a = (fabs(axis3.x()) > 0.9) ? vec3(0,1,0) : vec3(1,0,0);
+        axis2 = unit_vector(cross(axis3, a));
+        axis1 = cross(axis3, axis2);
+    }
+
+    __device__ void build(const vec3& n) {
         axis3 = unit_vector(n);
         vec3 a = (fabs(axis3.x()) > 0.9) ? vec3(0,1,0) : vec3(1,0,0);
         axis2 = unit_vector(cross(axis3, a));

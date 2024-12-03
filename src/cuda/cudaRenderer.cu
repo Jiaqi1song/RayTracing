@@ -7,7 +7,7 @@
 
 #include <chrono>
 
-#define MAX_OBJS 200
+#define MAX_OBJS 4000
 #define MAX_LIGHT_SOURCE 2
 
 #define checkCudaErrors(val) check_cuda((val), #val, __FILE__, __LINE__)
