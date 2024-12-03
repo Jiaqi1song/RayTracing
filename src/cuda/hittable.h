@@ -33,6 +33,7 @@ public:
     __device__ virtual bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const = 0;
     __device__ virtual aabb bounding_box() const = 0;
     __device__ virtual HittableType get_type() const = 0; 
+    aabb bbox;
 };
 
 class hittable_list : public hittable
@@ -42,7 +43,8 @@ public:
     int obj_num;
 
     __device__ hittable_list(hittable **objects, int obj_num) : objects(objects), obj_num(obj_num) 
-    {
+    {   
+        bbox = aabb::empty();
         for (int i = 0; i < obj_num; ++i)
         {
             bbox = aabb(bbox, objects[i]->bounding_box());
@@ -72,7 +74,6 @@ public:
 
     __device__ aabb bounding_box() const override { return bbox; }
 
-private:
     aabb bbox;
 };
 

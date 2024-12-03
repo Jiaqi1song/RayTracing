@@ -3,7 +3,7 @@
 #include "texture.h"
 #include "quad.h"
 #include "constant_medium.h"
-// #include "bvh.h"
+#include "bvh.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -65,8 +65,13 @@ __global__ void create_world1(hittable **d_list, hittable_list **d_world, camera
     d_list[i++] = new sphere(point3(-4.0f, 1.0f, 0.0f), 1.0f, new lambertian(color(0.4f, 0.2f, 0.1f)));
     d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
-    *d_world = new hittable_list(d_list, i);
-
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, i);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
+    
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 20.0f, point3(13.0f, 2.0f, 3.0f), point3(0.0f, 0.0f, 0.0f),
                       vec3(0.0f, 1.0f, 0.0f), 0.6f, 10.0f, color(0.70, 0.80, 1.00));
 }
@@ -97,7 +102,12 @@ __global__ void create_world2(hittable **d_list, hittable_list **d_world, camera
     // Glass Sphere
     d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
     
-    *d_world = new hittable_list(d_list, i);
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, i);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
 
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(278.0f, 278.0f, -800.0f), point3(278.0f, 278.0f, 0.0f),
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
@@ -165,7 +175,12 @@ __global__ void create_world3(hittable **d_list, hittable_list **d_world, camera
         d_list[i++] = new sphere(position1, 10, new lambertian(color(.73, .73, .73)));
     }
 
-    *d_world = new hittable_list(d_list, i);
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, i);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
 
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(478, 278, -600), point3(278, 278, 0),
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
@@ -252,8 +267,6 @@ int main(int argc, char* argv[])
     dim3 gridSize((image_width + blockdimx - 1) / blockdimx, (image_height + blockdimy - 1) / blockdimy);
     dim3 blockSize(blockdimx, blockdimy);
 
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     unsigned long seed = 1984;
     rand_init<<<1, 1>>>(d_rand_state, seed);
     init_random_state<<<gridSize, blockSize>>>(devStates, image_width, image_height, seed);
@@ -268,6 +281,8 @@ int main(int argc, char* argv[])
     
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
+
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     call_render<<<gridSize, blockSize>>>(d_world, cam, image_width, image_height, d_output, devStates);
     checkCudaErrors(cudaGetLastError());
