@@ -11,7 +11,7 @@ render=cuda
 #   1: first_scene
 #   2: cornell_box
 #   3: final_scene
-scene=1
+scene=2
 
 # Image size
 image_width=600
@@ -35,8 +35,8 @@ critical_section=false;
 use_bvh=false;
 
 # Number of sample and depth
-samples_per_pixel=200
-max_depth=20
+samples_per_pixel=10000
+max_depth=200
 
 if [ "$render" = "cpu" ]; then
     echo "Running CPU Ray Tracer..."
