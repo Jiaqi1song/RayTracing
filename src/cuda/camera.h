@@ -20,10 +20,14 @@ class camera
     vec3 u, v, w;
     vec3 defocus_disk_u;
     vec3 defocus_disk_v;
+    int sqrt_spp;
+    float recip_sqrt_spp;
 
     __device__ void initialize()
     {
-        pixel_samples_scale = 1.0f / samples_per_pixel;
+        sqrt_spp = int(sqrtf(samples_per_pixel));
+        pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
+        recip_sqrt_spp = 1.0 / sqrt_spp;
 
         camera_center = lookfrom;
         float theta = degrees_to_radians(vfov);
@@ -47,7 +51,7 @@ class camera
         defocus_disk_v = v * defocus_radius;
     }
 
-    __device__ color ray_color(const ray &r, hittable_list **world, curandState *state)
+    __device__ color ray_color(const ray &r, hittable_list **world, hittable_list **lights, curandState *state)
     {
         ray cur_ray = r;
         color final_color = color(0.0f, 0.0f, 0.0f);
@@ -58,12 +62,30 @@ class camera
             hit_record rec;
             if ((*world)->hit(cur_ray, interval(0.001f, FLT_MAX), rec, state))
             {
-                ray scattered;
-                color attenuation;
-                color color_from_emission = rec.mat->emitted(rec.u, rec.v, rec.hit_point);
+                scatter_record srec; 
+                color color_from_emission = rec.mat->emitted(rec, rec.u, rec.v, rec.hit_point);
                 
-                if (rec.mat->scatter(cur_ray, rec, attenuation, scattered, state))
+                if (rec.mat->scatter(cur_ray, rec, srec, state))
                 {
+                    if (srec.skip_pdf) {
+                        cur_attenuation *= srec.attenuation;
+                        cur_ray = srec.skip_pdf_ray;
+                        continue;
+                    }  
+                    
+                    vec3 light_pdf = (*lights)->random(rec.hit_point, state);
+                    vec3 scatter_direction = srec.generated_pdf;
+                    
+                    scatter_direction = mixture_pdf_generate(light_pdf, scatter_direction, state);
+                    ray scattered = ray(rec.hit_point, scatter_direction);
+
+                    float light_pdf_value = (*lights)->pdf_value(rec.hit_point, scattered.direction(), state);
+                    float next_ray_sampling_pdf = srec.pdf_value;
+                    next_ray_sampling_pdf = mixture_pdf_value(light_pdf_value, next_ray_sampling_pdf);
+
+                    auto scattering_pdf = rec.mat->scattering_pdf(cur_ray, rec, scattered, state);
+                    color attenuation = (srec.attenuation * scattering_pdf / next_ray_sampling_pdf);
+
                     final_color += cur_attenuation * color_from_emission;
                     cur_attenuation = cur_attenuation * attenuation;
                     cur_ray = scattered;
@@ -93,24 +115,35 @@ class camera
         return camera_center + (vec[0] * defocus_disk_u) + (vec[1] * defocus_disk_v);
     }
 
-    __device__ void get_ray(point3 pixel_center, ray &r, curandState *state) const
+    __device__ ray get_ray(int i, int j, int s_i, int s_j, curandState *state) const 
     {
-        point3 pixel_sample = pixel_center +
-                              ((random_float(state) - 0.5) * pixel_delta_u) +
-                              ((random_float(state) - 0.5) * pixel_delta_v);
-        point3 ray_origin = defocus_angle <= 0 ? camera_center : defocus_disk_sample(state);
-        r = ray(ray_origin, pixel_sample - ray_origin);
+        auto offset = sample_square_stratified(s_i, s_j, state);
+        auto pixel_sample = pixel00_loc
+                          + ((i + offset.x()) * pixel_delta_u)
+                          + ((j + offset.y()) * pixel_delta_v);
+
+        auto ray_origin = (defocus_angle <= 0) ? camera_center : defocus_disk_sample(state);
+        auto ray_direction = pixel_sample - ray_origin;
+
+        return ray(ray_origin, ray_direction);
     }
 
-    __device__ color compute_pixel_color(int i, int j, hittable_list **d_world, curandState *state)
+    __device__ vec3 sample_square_stratified(int s_i, int s_j, curandState *state) const {
+        auto px = ((s_i + random_float(state)) * recip_sqrt_spp) - 0.5;
+        auto py = ((s_j + random_float(state)) * recip_sqrt_spp) - 0.5;
+
+        return vec3(px, py, 0);
+    }
+
+    __device__ color compute_pixel_color(int i, int j, hittable_list **d_world, hittable_list **lights, curandState *state)
     {
         color pixel_color;
-        point3 current_pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
         ray r;
-        for (int sample = 0; sample < samples_per_pixel; sample++)
-        {
-            get_ray(current_pixel_center, r, state);
-            pixel_color += ray_color(r, d_world, state);
+        for (int s_j = 0; s_j < sqrt_spp; s_j++) {
+            for (int s_i = 0; s_i < sqrt_spp; s_i++) {
+                ray r = get_ray(i, j, s_i, s_j, state);
+                pixel_color += ray_color(r, d_world, lights, state);
+            }
         }
         return pixel_samples_scale * pixel_color;
     }
@@ -158,10 +191,10 @@ class camera
         initialize();
     }
 
-    __device__ void render(hittable_list **d_world, int i, int j, curandState *state, uint8_t *output)
+    __device__ void render(hittable_list **d_world, hittable_list **lights, int i, int j, curandState *state, uint8_t *output)
     {
         int pixel_index = j * image_width + i;
-        color c = compute_pixel_color(i, j, d_world, state);
+        color c = compute_pixel_color(i, j, d_world, lights, state);
         translate(c, pixel_index, output);
     }
 };

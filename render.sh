@@ -32,7 +32,7 @@ num_threads=8;
 critical_section=false;
 
 # Select if use BVH for CPU or CUDA (only support on CPU now)
-use_bvh=true;
+use_bvh=false;
 
 # Number of sample and depth
 samples_per_pixel=200

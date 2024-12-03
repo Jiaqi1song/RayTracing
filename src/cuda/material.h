@@ -4,13 +4,24 @@
 #include "color.h"
 #include "hittable.h"
 #include "texture.h"
+#include "pdf.h"
+
+class scatter_record {
+public:
+    color attenuation;
+    bool skip_pdf;
+    ray skip_pdf_ray;
+    float pdf_value;
+    vec3 generated_pdf;
+};
 
 class material
 {
 public:
     __device__ virtual ~material() {};
-    __device__ virtual bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &r_out, curandState *state) const = 0;
-    __device__ virtual color emitted(double u, double v, const point3& p) const {return color(0,0,0); }
+    __device__ virtual bool scatter(const ray &r_in, const hit_record &rec, scatter_record& srec, curandState *state) const {return false; };
+    __device__ virtual color emitted(const hit_record& rec, float u, float v, const point3& p) const {return color(0,0,0); }
+    __device__ virtual float scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered, curandState *state) const {return 0; }
 };
 
 class lambertian : public material
@@ -22,14 +33,20 @@ public:
     __device__ lambertian(const color& albedo) : tex(new solid_color(albedo)) {}
     __device__ lambertian(texture_custum *tex) : tex(tex) {}
 
-    __device__ bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &r_out, curandState *state) const override
+    __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override 
     {
-        vec3 scatter_direction = rec.normal_vector + random_unit_vector(state);
-        while (scatter_direction.near_zero())
-            scatter_direction = rec.normal_vector + random_unit_vector(state);
-        r_out = ray(rec.hit_point, scatter_direction);
-        attenuation = tex->value(rec.u, rec.v, rec.hit_point);
+        srec.attenuation = tex->value(rec.u, rec.v, rec.hit_point);
+        onb uvw(rec.normal_vector);
+        srec.generated_pdf = cosine_pdf_generate(uvw, state);
+        srec.pdf_value = cosine_pdf_value(uvw, srec.generated_pdf, state);
+        srec.skip_pdf = false;
         return true;
+    }
+
+    __device__ float scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered, curandState *state) const override 
+    {
+        auto cos_theta = dot(rec.normal_vector, unit_vector(scattered.direction()));
+        return cos_theta < 0 ? 0 : cos_theta/PI;
     }
 };
 
@@ -42,13 +59,13 @@ private:
 public:
     __device__ metal(const color &albedo, float fuzz) : albedo(albedo), fuzz(fminf(fmaxf(fuzz, 0.0f), 1.0f)) {}
 
-    __device__ bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &r_out, curandState *state) const override
-    {
-        vec3 reflect_direction = reflect(r_in.direction(), rec.normal_vector);
-        reflect_direction = unit_vector(reflect_direction) + fuzz * random_unit_vector(state);
-        r_out = ray(rec.hit_point, reflect_direction);
-        attenuation = albedo;
-        return (dot(reflect_direction, rec.normal_vector) > 0.0f);
+    __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override {
+        vec3 reflected = reflect(r_in.direction(), rec.normal_vector);
+        reflected = unit_vector(reflected) + (fuzz * random_unit_vector(state));
+        srec.attenuation = albedo;
+        srec.skip_pdf = true;
+        srec.skip_pdf_ray = ray(rec.hit_point, reflected);
+        return true;
     }
 };
 
@@ -56,7 +73,6 @@ class dielectric : public material
 {
 private:
     float refraction_index;
-    color dielectrics_attenuation = color(1.0f, 1.0f, 1.0f);
 
     __device__ static float reflectance(float cosine, float refraction_index)
     {
@@ -68,23 +84,24 @@ private:
 public:
     __device__ dielectric(float refraction_index) : refraction_index(refraction_index) {}
 
-    __device__ bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &r_out, curandState *state) const override
-    {
-        attenuation = dielectrics_attenuation;
-        float ri = rec.front_face ? (1.0f / refraction_index) : refraction_index;
+    __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override {
+        srec.attenuation = color(1.0, 1.0, 1.0);
+        srec.skip_pdf = true;
+        float ri = rec.front_face ? (1.0/refraction_index) : refraction_index;
 
-        float cos_theta = fminf(dot(-r_in.direction(), rec.normal_vector), 1.0f);
-        float sin_theta = sqrtf(1.0 - cos_theta * cos_theta);
+        vec3 unit_direction = unit_vector(r_in.direction());
+        float cos_theta = fminf(dot(-unit_direction, rec.normal_vector), 1.0);
+        float sin_theta = sqrtf(1.0 - cos_theta*cos_theta);
 
-        bool cannot_refract = ri * sin_theta > 1.0f;
+        bool cannot_refract = ri * sin_theta > 1.0;
         vec3 direction;
 
         if (cannot_refract || reflectance(cos_theta, ri) > random_float(state))
-            direction = reflect(r_in.direction(), rec.normal_vector);
+            direction = reflect(unit_direction, rec.normal_vector);
         else
-            direction = refract(r_in.direction(), rec.normal_vector, ri);
+            direction = refract(unit_direction, rec.normal_vector, ri);
 
-        r_out = ray(rec.hit_point, direction);
+        srec.skip_pdf_ray = ray(rec.hit_point, direction);
         return true;
     }
 };
@@ -95,12 +112,10 @@ class diffuse_light : public material
     __device__ diffuse_light(texture_custum *tex) : tex(tex) {}
     __device__ diffuse_light(const color& emit) : tex(new solid_color(emit)) {}
 
-    __device__ color emitted(double u, double v, const point3& p) const override {
+    __device__ color emitted(const hit_record& rec, float u, float v, const point3& p) const override {
+        if (!rec.front_face)
+            return color(0,0,0);
         return tex->value(u, v, p);
-    }
-
-    __device__ bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &r_out, curandState *state) const override {
-        return false;
     }
 
   private:
@@ -112,14 +127,22 @@ class isotropic : public material {
     __device__ isotropic(const color& albedo) : tex(new solid_color(albedo)) {}
     __device__ isotropic(texture_custum *tex) : tex(tex) {}
 
-    __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *state) const override {
-        scattered = ray(rec.hit_point, random_unit_vector(state));
-        attenuation = tex->value(rec.u, rec.v, rec.hit_point);
+    __device__ bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, curandState *state) const override 
+    {
+        srec.attenuation = tex->value(rec.u, rec.v, rec.hit_point);
+        srec.generated_pdf = sphere_pdf_generate(state);
+        srec.pdf_value = sphere_pdf_value(srec.generated_pdf, state);
+        srec.skip_pdf = false;
         return true;
+    }
+
+    __device__ float scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered, curandState *state) const override {
+        return 1 / (4 * PI);
     }
 
   private:
     texture_custum *tex;
+
 };
 
 

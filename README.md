@@ -18,8 +18,8 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 
 - [x] Basic setup on CUDA 
 - [x] Benchmark test case
-- [ ] Monte Carlo sampling on CUDA 
-- [ ] BVH acceleration on CUDA 
+- [x] Monte Carlo sampling on CUDA 
+- [x] BVH acceleration on CUDA 
 - [ ] Animation
 
 ## Compile and run the ray tracer (modify the parameters in the script)
