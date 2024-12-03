@@ -74,7 +74,7 @@ __global__ void create_world1(hittable **d_list, BVH_Node *bvh_data, hittable_li
     }
 
     // Light Sources
-    int j = 0 
+    int j = 0;
     d_light_list[j++] = new sphere(point3(0,-1000,0), 1, new material());
     d_light_list[j++] = new sphere(point3(0,-1000,0), 2, new material());
     *d_lights = new hittable_list(d_light_list, j);
@@ -119,7 +119,7 @@ __global__ void create_world2(hittable **d_list, BVH_Node *bvh_data, hittable_li
     }
 
     // Light Sources
-    int j = 0 
+    int j = 0; 
     d_light_list[j++] = new quad(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), new material());
     d_light_list[j++] = new sphere(point3(190, 90, 190), 90, new material());
     *d_lights = new hittable_list(d_light_list, j);
@@ -198,7 +198,7 @@ __global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_li
     }
 
     // Light Sources
-    int j = 0 
+    int j = 0; 
     d_light_list[j++] = new quad(point3(253,554,253), vec3(-300,0,0), vec3(0,0,-265), new material());
     *d_lights = new hittable_list(d_light_list, j);
 
