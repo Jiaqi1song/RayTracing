@@ -8,11 +8,11 @@ cmake --build build
 render=cuda
 
 # Select the scene
-#   1: first_scene
-#   2: cornell_box
-#   3: final_scene
-#   4: mesh_scene
-scene=2
+#   1: first_scene (488  objs)
+#   2: cornell_box (13   objs)
+#   3: final_scene (3409 objs)
+#   4: mesh_scene  (4974 objs)
+scene=4
 
 # Image size
 image_width=600
@@ -44,6 +44,9 @@ if [ "$render" = "cpu" ]; then
     if [ "$animation" = true ]; then
         ffmpeg -framerate 7 -i ./images/animation/image%d.ppm -y ./images/animation.gif
         rm ./images/animation/*.ppm
+    else
+        convert ./images/test.ppm ./images/test.png
+        rm ./images/test.ppm
     fi
 elif [ "$render" = "cuda" ]; then
     echo "Running CUDA Ray Tracer..."
@@ -51,6 +54,9 @@ elif [ "$render" = "cuda" ]; then
     if [ "$animation" = true ]; then
         ffmpeg -framerate 7 -i ./images/animation/image%d.ppm -y ./images/animation_cuda.gif
         rm ./images/animation/*.ppm
+    else
+        convert ./images/test_cuda.ppm ./images/test_cuda.png
+        rm ./images/test_cuda.ppm
     fi
 fi
 

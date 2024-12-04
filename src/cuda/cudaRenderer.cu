@@ -4,12 +4,12 @@
 #include "quad.h"
 #include "constant_medium.h"
 #include "bvh.h"
-// #include "triangle.h"
+#include "triangle.h"
 
 #include <chrono>
 #include <cstdlib>
 
-#define MAX_OBJS 4000
+#define MAX_OBJS 5000
 #define MAX_LIGHT_SOURCE 10
 
 #define checkCudaErrors(val) check_cuda((val), #val, __FILE__, __LINE__)
@@ -128,7 +128,7 @@ __global__ void create_world2(hittable **d_list, BVH_Node *bvh_data, hittable_li
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
-__global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **cam, int image_width,
+__global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, unsigned char *d_image_data, int width, int height, camera **cam, int image_width,
                              int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
 {
     curandState *local_rand_state = &devStates[0];
@@ -176,9 +176,9 @@ __global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_li
 
     boundary = new sphere(point3(0,0,0), 5000, new dielectric(1.5));
     d_list[i++] = new constant_medium(boundary, .0001, color(1,1,1));
-
-    auto tmat = new solid_color(.8, .1, .1);
-    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(tmat));
+    
+    auto emat = new image_texture(d_image_data, width, height);
+    d_list[i++] = new sphere(point3(400,200,400), 100, new lambertian(emat));
 
     auto pertext = new noise_texture(0.2, local_rand_state);
     d_list[i++] = new sphere(point3(220,280,300), 80, new lambertian(pertext));
@@ -206,6 +206,70 @@ __global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_li
                       vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
 }
 
+__global__ void create_world4(hittable **d_list, BVH_Node *bvh_data, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, float *d_vertices, float *d_indices, int nPoints, int nTriangles,
+                              camera **cam, int image_width, int image_height, curandState *devStates, int samples_per_pixel, int max_depth, bool use_bvh)
+{   
+    curandState *local_rand_state = &devStates[0];
+
+    // Cornell box sides
+    int i = 0;
+    d_list[i++] = new quad(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), new lambertian(color(.12, .45, .15)));
+    d_list[i++] = new quad(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), new lambertian(color(.65, .05, .05)));
+    d_list[i++] = new quad(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), new lambertian(color(.73, .73, .73)));
+    d_list[i++] = new quad(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), new lambertian(color(.73, .73, .73)));
+    d_list[i++] = new quad(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), new lambertian(color(.73, .73, .73)));
+
+    // Light
+    d_list[i++] = new quad(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), new diffuse_light(color(15, 15, 15)));
+
+    // Mesh
+    float scale = 230.0f;
+    for (int k = 0; k < nTriangles; k++) {
+        int idx0 = static_cast<int>(d_indices[k * 3 + 0]);
+        int idx1 = static_cast<int>(d_indices[k * 3 + 1]);
+        int idx2 = static_cast<int>(d_indices[k * 3 + 2]);
+
+        vec3 v0 = vec3(
+            d_vertices[idx0 * 3 + 0],
+            d_vertices[idx0 * 3 + 1],
+            d_vertices[idx0 * 3 + 2]
+        ) * scale;
+
+        vec3 v1 = vec3(
+            d_vertices[idx1 * 3 + 0],
+            d_vertices[idx1 * 3 + 1],
+            d_vertices[idx1 * 3 + 2]
+        ) * scale;
+
+        vec3 v2 = vec3(
+            d_vertices[idx2 * 3 + 0],
+            d_vertices[idx2 * 3 + 1],
+            d_vertices[idx2 * 3 + 2]
+        ) * scale;
+
+        vec3 v00 = transform_mesh(v0, vec3(265,120,295), 180);
+        vec3 v11 = transform_mesh(v1, vec3(265,120,295), 180);
+        vec3 v22 = transform_mesh(v2, vec3(265,120,295), 180);
+
+        d_list[i++] = new triangle(v00, v11, v22, new metal(color(0.8, 0.85, 0.88), 0.0), false);
+    }
+
+    if (use_bvh) {
+        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 1);
+    } else {
+        *d_world = new hittable_list(d_list, i);
+    }
+
+    // Light Sources
+    int j = 0; 
+    d_light_list[j++] = new quad(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), new material());
+    d_light_list[j++] = new sphere(point3(190, 90, 190), 90, new material());
+    *d_lights = new hittable_list(d_light_list, j);
+
+    *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 40.0f, point3(278.0f, 278.0f, -800.0f), point3(278.0f, 278.0f, 0.0f),
+                      vec3(0.0f, 1.0f, 0.0f), 0.0f, 10.0f, color(0,0,0));
+}
 
 __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable **d_light_list, hittable_list **d_lights, camera **d_camera)
 {
@@ -217,6 +281,8 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable 
             delete ((quad*)d_list[i])->get_mat();          
         } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
             delete ((constant_medium*)d_list[i])->get_mat();          
+        } else if (d_list[i]->get_type() == HittableType::TRIANGLE) {
+            delete ((triangle*)d_list[i])->get_mat();          
         }
         delete d_list[i];
     }
@@ -227,8 +293,10 @@ __global__ void free_world(hittable **d_list, hittable_list **d_world, hittable 
             delete ((sphere*)d_light_list[i])->get_mat();     
         } else if (d_light_list[i]->get_type() == HittableType::QUAD) {
             delete ((quad*)d_light_list[i])->get_mat();          
-        } else if (d_list[i]->get_type() == HittableType::MEDIUM) {
+        } else if (d_light_list[i]->get_type() == HittableType::MEDIUM) {
             delete ((constant_medium*)d_light_list[i])->get_mat();          
+        } else if (d_light_list[i]->get_type() == HittableType::TRIANGLE) {
+            delete ((triangle*)d_light_list[i])->get_mat();          
         }
         delete d_light_list[i];
     }
@@ -338,6 +406,25 @@ int main(int argc, char* argv[])
     camera **cam;
     checkCudaErrors(cudaMalloc((void **)&cam, sizeof(camera)));
 
+    // Allocate memory for mesh objects
+    float *vertices = new float[MAX_OBJS * 3];
+    float *indices =  new float[MAX_OBJS * 3];
+
+    float *d_vertices;
+    float *d_indices;
+
+    checkCudaErrors(cudaMalloc((void **)&d_vertices, MAX_OBJS * 3 * sizeof(float)));
+    checkCudaErrors(cudaMalloc((void **)&d_indices, MAX_OBJS * 3 * sizeof(float)));
+    int nPoints = 0, nTriangles = 0;
+
+    // Allocate memory for texture image data
+    int width = 0, height = 0;
+    unsigned char *image_data = load_image("./images/resource/earthmap.jpg", width, height); 
+
+    unsigned char *d_image_data;
+    checkCudaErrors(cudaMalloc((void **)&d_image_data, 3 * width * height * sizeof(unsigned char)));
+    checkCudaErrors(cudaMemcpy(d_image_data, image_data, 3 * width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
+
     int blockdimx = 16;
     int blockdimy = 16;
     dim3 gridSize((image_width + blockdimx - 1) / blockdimx, (image_height + blockdimy - 1) / blockdimy);
@@ -352,7 +439,14 @@ int main(int argc, char* argv[])
     switch (scene) {
         case 1: create_world1<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
         case 2: create_world2<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
-        case 3: create_world3<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 3: create_world3<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, d_image_data, width, height, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); break;
+        case 4: 
+            parse_obj("./shapes/small_bunny.obj", vertices, indices, nPoints, nTriangles);
+            checkCudaErrors(cudaMemcpy(d_vertices, vertices, nPoints * 3 * sizeof(float), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_indices, indices, nTriangles * 3 * sizeof(float), cudaMemcpyHostToDevice));
+
+            create_world4<<<1, 1>>>(d_list, bvh_data, d_world, d_light_list, d_lights, d_vertices, d_indices, nPoints, nTriangles, cam, image_width, image_height, d_rand_state, samples_per_pixel, max_depth, use_bvh); 
+            break;
     }
     
     checkCudaErrors(cudaGetLastError());
@@ -409,6 +503,12 @@ int main(int argc, char* argv[])
     checkCudaErrors(cudaFree(devStates));
     checkCudaErrors(cudaFree(d_output));
     checkCudaErrors(cudaFree(cam));
-    cudaDeviceReset();
+    checkCudaErrors(cudaFree(d_vertices));
+    checkCudaErrors(cudaFree(d_indices));
+    checkCudaErrors(cudaFree(d_image_data));
+    delete[] image_data;
+    delete[] vertices;
+    delete[] indices;
     delete[] h_output;
+    cudaDeviceReset();
 }

@@ -1,8 +1,21 @@
 #ifndef COLOR_H
 #define COLOR_H
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_FAILURE_USERMSG
+
+#pragma nv_diag_suppress 550
+#include "stb_image.h"
+#pragma nv_diag_default 550
+
 #include "vec.h"
 #include <cstdint>
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <cstring>
 
 class color
 {
@@ -153,6 +166,129 @@ inline void write_color(uint8_t *h_output, int image_width, int image_height, co
     }
 
     fclose(fp);
+}
+
+
+// Host-only function for parsing object
+inline void parse_obj(const char* filename, 
+            float* vertices, 
+            float* indices, 
+            int& nPoints, 
+            int& nTriangles) {
+
+    std::ifstream objFile(filename); 
+    if (!objFile.is_open()) {
+        std::cerr << "Error: Cannot open the OBJ file: " << filename << std::endl;
+        return;
+    }
+
+    std::vector<float> points;   
+    std::vector<float> idxVertex;  
+
+    std::string line;
+    nPoints = 0;
+    nTriangles = 0;
+
+    while (std::getline(objFile, line)) {
+        std::stringstream ss(line);
+        std::string label;
+        ss >> label;
+
+        if (label == "v") {
+            float x, y, z;
+            ss >> x >> y >> z;
+            points.push_back(x);
+            points.push_back(y);
+            points.push_back(z);
+            nPoints++;
+        } else if (label == "f") {
+            int v1, v2, v3;
+            ss >> v1 >> v2 >> v3;
+            idxVertex.push_back(v1 - 1); // Convert to 0-based indexing
+            idxVertex.push_back(v2 - 1);
+            idxVertex.push_back(v3 - 1);
+            nTriangles++;
+        }
+    }
+
+    objFile.close(); 
+
+    std::memcpy(vertices, points.data(), points.size() * sizeof(float));
+    std::memcpy(indices, idxVertex.data(), idxVertex.size() * sizeof(float));
+
+    // Perform centering and scaling
+    float meanX = 0, meanY = 0, meanZ = 0;
+    for (int i = 0; i < nPoints; ++i) {
+        meanX += vertices[i * 3 + 0];
+        meanY += vertices[i * 3 + 1];
+        meanZ += vertices[i * 3 + 2];
+    }
+    meanX /= nPoints;
+    meanY /= nPoints;
+    meanZ /= nPoints;
+
+    for (int i = 0; i < nPoints; ++i) {
+        vertices[i * 3 + 0] -= meanX;
+        vertices[i * 3 + 1] -= meanY;
+        vertices[i * 3 + 2] -= meanZ;
+    }
+
+    float maxDistance = 0.0f;
+    for (int i = 0; i < nPoints; ++i) {
+        float dist = sqrt(vertices[i * 3 + 0] * vertices[i * 3 + 0] +
+                          vertices[i * 3 + 1] * vertices[i * 3 + 1] +
+                          vertices[i * 3 + 2] * vertices[i * 3 + 2]);
+        maxDistance = std::max(maxDistance, dist);
+    }
+
+    for (int i = 0; i < nPoints; ++i) {
+        vertices[i * 3 + 0] /= maxDistance;
+        vertices[i * 3 + 1] /= maxDistance;
+        vertices[i * 3 + 2] /= maxDistance;
+    }
+}
+
+// Host-only function for loading images
+inline unsigned char *load_image(const char* image_filename, int& width, int& height) {
+
+    auto filename = std::string(image_filename);
+    auto imagedir = getenv("RTW_IMAGES");
+
+    const int      bytes_per_pixel = 3;
+    float         *fdata = nullptr;        
+    unsigned char *bdata = nullptr;         
+    int            image_width = 0;        
+    int            image_height = 0;       
+
+    auto n = bytes_per_pixel; 
+    fdata = stbi_loadf(filename.c_str(), &image_width, &image_height, &n, bytes_per_pixel);
+
+    if (fdata == nullptr)  {
+        std::cerr << "Error: Cannot Read Image File: " << filename << std::endl;
+        return nullptr;
+    }
+    width = image_width;
+    height = image_height;
+
+    int total_bytes = image_width * image_height * bytes_per_pixel;
+    bdata = new unsigned char[total_bytes];
+
+    auto *bptr = bdata;
+    auto *fptr = fdata;
+
+    float value;
+    for (auto i=0; i < total_bytes; i++, fptr++, bptr++) {
+        value = *fptr;
+        if (value <= 0.0) {
+            *bptr = 0;
+        } else if (1.0 <= value) {
+            *bptr = 255;
+        } else {
+            *bptr = static_cast<unsigned char>(256.0 * value);
+        }
+    }
+
+    return bdata;
 }
 
 #endif

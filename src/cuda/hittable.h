@@ -6,7 +6,7 @@
 #include "aabb.h"
 
 class material;
-enum HittableType { SPHERE, QUAD, MEDIUM, HITTABLE_LIST, BVH, ROTATE, TRANSLATE };
+enum HittableType { SPHERE, QUAD, MEDIUM, TRIANGLE, HITTABLE_LIST, BVH, ROTATE, TRANSLATE };
 
 class hit_record
 {

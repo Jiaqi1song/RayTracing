@@ -3,32 +3,34 @@
 
 #include "hittable.h"
 #include "material.h"
-#include "bvh.h"
+#include "vec.h"
 
 class triangle : public hittable {
 public:
-    triangle(const vec3 vs[3], shared_ptr<material> mat, bool cull = false)
+    __device__ triangle(const vec3 v1, const vec3 v2, const vec3 v3, material *mat, bool cull = false)
         : EPSILON(0.000001), mat(mat), backCulling(cull) {
-        for (int i = 0; i < 3; i++) {
-            vertices[i] = vs[i];
-        }
+        vertices1 = v1;
+        vertices2 = v2;
+        vertices3 = v3;
         compute_normal();
     }
 
-    bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
-        vec3 edge1 = vertices[1] - vertices[0];
-        vec3 edge2 = vertices[2] - vertices[0];
+    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override {
+        vec3 edge1 = vertices2 - vertices1;
+        vec3 edge2 = vertices3 - vertices1;
         vec3 h = cross(r.direction(), edge2);
         float a = dot(edge1, h);
 
         if (backCulling && a < EPSILON)
             return false;
 
-        if (std::fabs(a) < EPSILON)
+        if (fabs(a) < EPSILON)
             return false;
 
         float f = 1.0 / a;
-        vec3 s = r.origin() - vertices[0];
+
+        vec3 r_origin_vec = vec3(r.origin().x(), r.origin().y(), r.origin().z());
+        vec3 s = r_origin_vec - vertices1;
         float u = f * dot(s, h);
 
         if (u < 0.0 || u > 1.0)
@@ -45,130 +47,68 @@ public:
             return false;
 
         rec.t = t;
-        rec.p = r.at(t);
-        rec.normal = normal;
+        rec.hit_point = r.at(t);
+        rec.normal_vector = normal;
         rec.mat = mat;
-        rec.set_face_normal(r, rec.normal);
+        rec.set_face_normal(r, rec.normal_vector);
         rec.u = u;
         rec.v = v;
 
         return true;
     }
 
-    aabb bounding_box() const override {
-        float minX = std::min(vertices[0].x(), std::min(vertices[1].x(), vertices[2].x()));
-        float minY = std::min(vertices[0].y(), std::min(vertices[1].y(), vertices[2].y()));
-        float minZ = std::min(vertices[0].z(), std::min(vertices[1].z(), vertices[2].z()));
+    __device__ HittableType get_type() const override { return HittableType::TRIANGLE; }
+    __device__ material* get_mat() { return mat; }
 
-        float maxX = std::max(vertices[0].x(), std::max(vertices[1].x(), vertices[2].x()));
-        float maxY = std::max(vertices[0].y(), std::max(vertices[1].y(), vertices[2].y()));
-        float maxZ = std::max(vertices[0].z(), std::max(vertices[1].z(), vertices[2].z()));
+    __device__ aabb bounding_box() const override {
+        float minX = fminf(vertices1.x(), fminf(vertices2.x(), vertices3.x()));
+        float minY = fminf(vertices1.y(), fminf(vertices2.y(), vertices3.y()));
+        float minZ = fminf(vertices1.z(), fminf(vertices2.z(), vertices3.z()));
+
+        float maxX = fmaxf(vertices1.x(), fmaxf(vertices2.x(), vertices3.x()));
+        float maxY = fmaxf(vertices1.y(), fmaxf(vertices2.y(), vertices3.y()));
+        float maxZ = fmaxf(vertices1.z(), fmaxf(vertices2.z(), vertices3.z()));
 
         return aabb(point3(minX, minY, minZ), point3(maxX, maxY, maxZ));
     }
 
 private:
-    vec3 vertices[3];
+    vec3 vertices1;
+    vec3 vertices2;
+    vec3 vertices3;
     vec3 normal;
-    shared_ptr<material> mat;
+    material *mat;
     bool backCulling;
     const float EPSILON;
 
-    void compute_normal() {
-        vec3 edge1 = vertices[1] - vertices[0];
-        vec3 edge2 = vertices[2] - vertices[0];
+    __device__ void compute_normal() {
+        vec3 edge1 = vertices2 - vertices1;
+        vec3 edge2 = vertices3 - vertices1;
         normal = unit_vector(cross(edge1, edge2));
     }
 };
 
-inline hittable_list build_mesh(const char* filename, shared_ptr<material> mat, double scale, bool use_bvh) {
 
-    hittable_list mesh_obj;
-    std::vector<vec3> vertices(5000); 
-    std::vector<vec3> indices(5000);
+__device__ inline vec3 transform_mesh(const vec3& input_vec, const vec3& translate_vec, float angle) {
+    float radians = degrees_to_radians(angle);
+    float sin_theta = sinf(radians);
+    float cos_theta = cosf(radians);
 
-    // Parse the OBJ file
-    int nPoints = 0, nTriangles = 0;
-    parse_obj(filename, vertices, indices, nPoints, nTriangles);
+    float x = input_vec.x();
+    float y = input_vec.y();
+    float z = input_vec.z();
 
-    // Scaling
-    for(vec3& p : vertices) p *= scale;
+    float rotated_x = cos_theta * x + sin_theta * z;
+    float rotated_y = y;  
+    float rotated_z = -sin_theta * x + cos_theta * z;
 
-    // Create triangles and add them to the mesh
-    for (int i = 0; i < nTriangles; i++) {
-        vec3 v0 = vertices[static_cast<int>(indices[i].x())];
-        vec3 v1 = vertices[static_cast<int>(indices[i].y())];
-        vec3 v2 = vertices[static_cast<int>(indices[i].z())];
+    float x1 = rotated_x + translate_vec.x();
+    float y1 = rotated_y + translate_vec.y();
+    float z1 = rotated_z + translate_vec.z();
 
-        auto obj = make_shared<triangle>(std::array<vec3, 3>{v0, v1, v2}.data(), mat, false);
-        mesh_obj.add(obj);
-    }
-
-    if (use_bvh) mesh_obj = hittable_list(make_shared<bvh_node>(mesh_obj));
-
-    return mesh_obj;
+    return vec3(x1, y1, z1);
 }
 
-void parse_obj(const char* filename, 
-                std::vector<vec3>& points, 
-                std::vector<vec3>& idxVertex, 
-                int& nPoints, 
-                int& nTriangles) {
 
-    std::ifstream objFile(filename); 
-    if (!objFile.is_open()) {
-        std::cerr << "Error: Cannot open the OBJ file: " << filename << std::endl;
-        return;
-    }
-
-    int np = 0, nt = 0; // Initialize counters for vertices and triangles
-    std::string line;
-
-    while (std::getline(objFile, line)) {
-        std::stringstream ss(line);
-        std::string label;
-        ss >> label;
-
-        if (label == "v") {
-            vec3 vertex;
-            ss >> vertex[0] >> vertex[1] >> vertex[2];
-            points[np++] = vertex;
-        } else if (label == "f") {
-            vec3 idx;
-            ss >> idx[0] >> idx[1] >> idx[2];
-            idx[0] -= 1; idx[1] -= 1; idx[2] -= 1; // Adjust to 0-based indexing
-            idxVertex[nt++] = idx;
-        }
-    }
-
-    objFile.close(); // Close the file
-
-    // Update the number of vertices and triangles
-    nPoints = np;
-    nTriangles = nt;
-
-    // Optional: Centering and scaling
-    vec3 mean = vec3(0, 0, 0);
-    for (int i = 0; i < nPoints; i++) {
-        mean += points[i];
-    }
-    mean /= float(nPoints);
-
-    for (int i = 0; i < nPoints; i++) {
-        points[i] += -mean;
-    }
-
-    float maxDistance = 0.0f;
-    for (int i = 0; i < nPoints; i++) {
-        float dist = points[i].length();
-        if (dist > maxDistance) {
-            maxDistance = dist;
-        }
-    }
-
-    for (int i = 0; i < nPoints; i++) {
-        points[i] /= maxDistance;
-    }
-}  
 
 #endif 
