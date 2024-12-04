@@ -82,6 +82,7 @@ public:
         bool hit_anything = false;
         interval closest_so_far = ray_t;
 
+        // Pre-order tree traversal
         while (!stack.empty()) {
             hittable* current = stack.pop();
             if (!current->bbox.hit(r, closest_so_far))

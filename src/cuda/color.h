@@ -128,9 +128,31 @@ __device__ void translate(color c, int pixel_index, uint8_t *output)
 }
 
 // Host-only function for writing color to output stream
-inline void write_color(std::ostream &out, uint8_t ir, uint8_t ig, uint8_t ib)
+inline void write_color(uint8_t *h_output, int image_width, int image_height, const char *filename)
 {
-    std::cout << static_cast<int>(ir) << " " << static_cast<int>(ig) << " " << static_cast<int>(ib) << "\n";
+
+    FILE *fp = fopen(filename, "wb");
+
+    if (!fp) {
+        fprintf(stderr, "Error: could not open %s for write\n", filename);
+        exit(1);
+    }
+
+    // write ppm header
+    fprintf(fp, "P3\n");
+    fprintf(fp, "%d %d\n", image_width, image_height);
+    fprintf(fp, "255\n");
+
+    for (int i = 0; i < image_height; i++) {
+        for (int j = 0; j < image_width; j++) {
+            int start_write_index = 3 * (i * image_width + j);
+            fprintf(fp, "%d %d %d\n", static_cast<int>(h_output[start_write_index]), 
+                                      static_cast<int>(h_output[start_write_index+1]), 
+                                      static_cast<int>(h_output[start_write_index+2]));
+        }
+    }
+
+    fclose(fp);
 }
 
 #endif

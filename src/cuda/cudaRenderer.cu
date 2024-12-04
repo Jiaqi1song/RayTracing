@@ -76,7 +76,6 @@ __global__ void create_world1(hittable **d_list, BVH_Node *bvh_data, hittable_li
     // Light Sources
     int j = 0;
     d_light_list[j++] = new sphere(point3(0,-1000,0), 1, new material());
-    d_light_list[j++] = new sphere(point3(0,-1000,0), 2, new material());
     *d_lights = new hittable_list(d_light_list, j);
     
     *cam = new camera(image_width, image_height, samples_per_pixel, max_depth, 20.0f, point3(13.0f, 2.0f, 3.0f), point3(0.0f, 0.0f, 0.0f),
@@ -257,6 +256,31 @@ __global__ void rand_init(curandState *rand_state, unsigned long seed) {
     }
 }
 
+__global__ void move_camera(camera **cam, int animation_method, int frame) {
+    if (animation_method == 0) {
+        (*cam)->camera_rotate();
+        (*cam)->camera_zoom();
+    }
+    if (animation_method == 1) {
+        if (frame < 7) {
+            (*cam)->camera_translate(FORWARD);
+        } else if (frame < 14) {
+            (*cam)->camera_translate(BACKWARD);
+        } else if (frame < 21) {
+            (*cam)->camera_translate(LEFT);
+        } else if (frame < 28) {
+            (*cam)->camera_translate(RIGHT);
+        } else if (frame < 35) {
+            (*cam)->camera_translate(UP);
+        } else if (frame < 42) {
+            (*cam)->camera_translate(DOWN);
+        }
+    }
+    (*cam)->initialize();
+}
+
+
+
 int main(int argc, char* argv[])
 {
     int image_width = 1080;
@@ -264,7 +288,11 @@ int main(int argc, char* argv[])
     int samples_per_pixel = 20000;
     int max_depth = 100;
     int scene = 3;
-    bool use_bvh = false; // TODO: Fix the dynamic memory allocation problems
+    bool use_bvh = false;
+    bool animation = true;
+    int animation_method = 1;
+    char filepath[1024];
+    std::string filename = "./images/test_cuda.ppm";
 
     // Parsing input arguments
     if (argc > 1) {
@@ -274,6 +302,8 @@ int main(int argc, char* argv[])
         use_bvh = std::string(argv[4]) == "true";
         image_width = std::atoi(argv[5]);
         image_height = std::atoi(argv[6]);
+        animation = std::string(argv[7]) == "true";
+        animation_method = std::atoi(argv[8]);
     }
 
     int total_pixels = image_width * image_height;
@@ -281,6 +311,8 @@ int main(int argc, char* argv[])
     std::clog << "samples_per_pixel: " << samples_per_pixel << " \n";
     std::clog << "max_depth: " << max_depth << " \n";
     std::clog << "use_bvh: " << use_bvh << " \n";
+    std::clog << "animation: " << animation << " \n";
+    std::clog << "animation_method: " << animation_method << " \n";
 
     curandState *devStates;
     checkCudaErrors(cudaMalloc((void **)&devStates, total_pixels * sizeof(curandState)));
@@ -325,12 +357,40 @@ int main(int argc, char* argv[])
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
+    uint8_t *h_output = new uint8_t[image_width * image_height * 3];
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    call_render<<<gridSize, blockSize>>>(d_world, d_lights, cam, image_width, image_height, d_output, devStates);
-    checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
+    if (!animation) {
+        call_render<<<gridSize, blockSize>>>(d_world, d_lights, cam, image_width, image_height, d_output, devStates);
+        checkCudaErrors(cudaGetLastError());
+        checkCudaErrors(cudaDeviceSynchronize());
+        
+        checkCudaErrors(cudaMemcpy(h_output, d_output, image_width * image_height * 3 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+        write_color(h_output, image_width, image_height, filename.c_str());
+    } else {
+        int animation_sample;
+        if (animation_method == 0) {
+            animation_sample = 62;
+        } else if (animation_method == 1) {
+            animation_sample = 42;
+        } 
 
+        std::clog << "\rTotal frames: " << animation_sample << ": \n";
+        for (int frame = 0; frame < animation_sample; ++frame) {
+            sprintf(filepath, "./images/animation/image%d.ppm", frame);
+            
+            std::clog << "\rStart Rendering Frame " << frame << ": \n";
+            move_camera<<<1, 1>>>(cam, animation_method, frame);
+            call_render<<<gridSize, blockSize>>>(d_world, d_lights, cam, image_width, image_height, d_output, devStates);
+            checkCudaErrors(cudaGetLastError());
+            checkCudaErrors(cudaDeviceSynchronize());
+
+            checkCudaErrors(cudaMemcpy(h_output, d_output, image_width * image_height * 3 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+            std::clog << "\rRendering Frame " << frame << " Done.       \n";
+            write_color(h_output, image_width, image_height, filepath);
+        }
+    }
+    
     auto end_time = std::chrono::high_resolution_clock::now();
     auto render_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     float total_time = render_time.count();
@@ -338,22 +398,6 @@ int main(int argc, char* argv[])
 
     std::clog << "Total render time (ms): " << total_time << "\n";
     std::clog << "Average time per pixel (ms): " << avg_time_per_pixel << "\n";
-
-    uint8_t *h_output = new uint8_t[image_width * image_height * 3];
-    checkCudaErrors(
-        cudaMemcpy(h_output, d_output, image_width * image_height * 3 * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-
-    std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
-    for (int i = 0; i < image_height; i++)
-    { // Row
-        for (int j = 0; j < image_width; j++)
-        { // Column
-            int start_write_index = 3 * (i * image_width + j);
-            write_color(std::cout, h_output[start_write_index], h_output[start_write_index + 1],
-                        h_output[start_write_index + 2]);
-        }
-    }
-
     std::clog << "\rDone.                   \n";
 
     checkCudaErrors(cudaDeviceSynchronize());
