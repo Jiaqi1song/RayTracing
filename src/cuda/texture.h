@@ -2,6 +2,7 @@
 #define TEXTURE_H
 
 #include "perlin.h"
+#include "color.h"
 
 class texture_custum {
   public:
@@ -60,6 +61,33 @@ class noise_texture : public texture_custum {
     float scale;
 };
 
+class image_texture : public texture_custum {
+  public:
+    __device__ image_texture(unsigned char* data, int image_width, int image_height) : image_data(data), image_width(image_width), image_height(image_height) {}
+
+    __device__ color value(float u, float v, const point3& p) const override {
+
+        if (image_height <= 0) return color(0,1,1);
+        u = interval(0,1).clamp(u);
+        v = 1.0 - interval(0,1).clamp(v);  
+
+        auto i = int(u * image_width);
+        auto j = int(v * image_height);
+
+        i = fmaxf(0, fminf(i, image_width - 1));
+        j = fmaxf(0, fminf(j, image_height - 1));
+
+        int bytes_per_scanline = image_width * 3;
+        auto pixel = image_data + j * bytes_per_scanline + i * 3;
+        auto color_scale = 1.0 / 255.0;
+        return color(color_scale*pixel[0], color_scale*pixel[1], color_scale*pixel[2]);
+    }
+
+  private:
+    unsigned char *image_data;
+    int image_width;
+    int image_height;
+};
 
 
 #endif

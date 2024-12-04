@@ -21,6 +21,7 @@ set ( CPURENDERER
   src/cpu/cpuRenderer.cpp
   src/cpu/stb_image.h
   src/cpu/aabb.h
+  src/cpu/triangle.h
   src/cpu/camera.h
   src/cpu/color.h
   src/cpu/constant_medium.h
@@ -45,9 +46,11 @@ set ( GPURENDERER
   src/cuda/cudaRenderer.cu
   src/cuda/aabb.h
   src/cuda/bvh.h
+  src/cuda/triangle.h
   src/cuda/camera.h
   src/cuda/color.h
   src/cuda/constant_medium.h
+  src/cuda/stb_image.h
   src/cuda/hittable.h
   src/cuda/interval.h
   src/cuda/material.h
@@ -66,6 +69,10 @@ include_directories(src)
 # Executables
 add_executable(cpuRayTracer ${CPURENDERER})
 add_executable(cudaRayTracer ${GPURENDERER})
+
+# Suppress ptxas warnings in CUDA
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xptxas=-w")
+target_compile_options(cudaRayTracer PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xptxas=-w>)
 
 # OpenMP for CPU
 find_package(OpenMP)

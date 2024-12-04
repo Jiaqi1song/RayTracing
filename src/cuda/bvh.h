@@ -82,6 +82,7 @@ public:
         bool hit_anything = false;
         interval closest_so_far = ray_t;
 
+        // Pre-order tree traversal
         while (!stack.empty()) {
             hittable* current = stack.pop();
             if (!current->bbox.hit(r, closest_so_far))
@@ -134,7 +135,7 @@ __device__ static bool box_z_compare(const hittable* a, const hittable* b) {
 
 __device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state) {
 
-    DynamicStack<BVH_Node> stack(bvh_data, 4000);
+    DynamicStack<BVH_Node> stack(bvh_data, 5000);
     
     bvh_node* root = new bvh_node();
     stack.push(BVH_Node{ root, 0, object_count });

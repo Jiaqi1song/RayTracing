@@ -6,7 +6,7 @@
 #include "aabb.h"
 
 class material;
-enum HittableType { SPHERE, QUAD, MEDIUM, HITTABLE_LIST, BVH};
+enum HittableType { SPHERE, QUAD, MEDIUM, TRIANGLE, HITTABLE_LIST, BVH, ROTATE, TRANSLATE };
 
 class hit_record
 {
@@ -95,6 +95,126 @@ public:
     aabb bbox;
 };
 
+
+class translate : public hittable {
+  public:
+    __device__ translate(hittable *object, const vec3& offset)
+      : object(object), offset(offset)
+    {
+        bbox = object->bounding_box() + offset;
+    }
+
+    __device__ HittableType get_type() const override { return HittableType::TRANSLATE; }
+
+    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override {
+        // Move the ray backwards by the offset
+        ray offset_r(r.origin() - offset, r.direction());
+
+        // Determine whether an intersection exists along the offset ray (and if so, where)
+        if (!object->hit(offset_r, ray_t, rec, state))
+            return false;
+
+        // Move the intersection point forwards by the offset
+        rec.hit_point += offset;
+
+        return true;
+    }
+
+    __device__ aabb bounding_box() const override { return bbox; }
+    aabb bbox;
+
+  private:
+    hittable *object;
+    vec3 offset;
+    
+};
+
+
+class rotate_y : public hittable {
+  public:
+    __device__ rotate_y(hittable *object, float angle) : object(object) {
+        auto radians = degrees_to_radians(angle);
+        sin_theta = sinf(radians);
+        cos_theta = cosf(radians);
+        bbox = object->bounding_box();
+
+        point3 min( FLT_MAX,  FLT_MAX,  FLT_MAX);
+        point3 max(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                for (int k = 0; k < 2; k++) {
+                    auto x = i*bbox.x.max + (1-i)*bbox.x.min;
+                    auto y = j*bbox.y.max + (1-j)*bbox.y.min;
+                    auto z = k*bbox.z.max + (1-k)*bbox.z.min;
+
+                    auto newx =  cos_theta*x + sin_theta*z;
+                    auto newz = -sin_theta*x + cos_theta*z;
+
+                    vec3 tester(newx, y, newz);
+
+                    for (int c = 0; c < 3; c++) {
+                        min[c] = fminf(min[c], tester[c]);
+                        max[c] = fmaxf(max[c], tester[c]);
+                    }
+                }
+            }
+        }
+
+        bbox = aabb(min, max);
+    }
+
+    __device__ HittableType get_type() const override { return HittableType::ROTATE; }
+
+    __device__ bool hit(const ray &r, const interval &ray_t, hit_record &rec, curandState *state) const override {
+
+        // Transform the ray from world space to object space.
+
+        auto origin = point3(
+            (cos_theta * r.origin().x()) - (sin_theta * r.origin().z()),
+            r.origin().y(),
+            (sin_theta * r.origin().x()) + (cos_theta * r.origin().z())
+        );
+
+        auto direction = vec3(
+            (cos_theta * r.direction().x()) - (sin_theta * r.direction().z()),
+            r.direction().y(),
+            (sin_theta * r.direction().x()) + (cos_theta * r.direction().z())
+        );
+
+        ray rotated_r(origin, direction);
+
+        // Determine whether an intersection exists in object space (and if so, where).
+
+        if (!object->hit(rotated_r, ray_t, rec, state))
+            return false;
+
+        // Transform the intersection from object space back to world space.
+
+        rec.hit_point = point3(
+            (cos_theta * rec.hit_point.x()) + (sin_theta * rec.hit_point.z()),
+            rec.hit_point.y(),
+            (-sin_theta * rec.hit_point.x()) + (cos_theta * rec.hit_point.z())
+        );
+
+        rec.normal_vector = vec3(
+            (cos_theta * rec.normal_vector.x()) + (sin_theta * rec.normal_vector.z()),
+            rec.normal_vector.y(),
+            (-sin_theta * rec.normal_vector.x()) + (cos_theta * rec.normal_vector.z())
+        );
+
+        return true;
+    }
+
+    __device__ aabb bounding_box() const override { return bbox; }
+    aabb bbox;
+
+  private:
+    hittable *object;
+    float sin_theta;
+    float cos_theta;
+    
+};
 
 
 #endif

@@ -6,6 +6,15 @@
 #include "hittable.h"
 #include "material.h"
 
+enum CameraMovement {
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN
+};
+
 class camera
 {
   private:
@@ -22,34 +31,6 @@ class camera
     vec3 defocus_disk_v;
     int sqrt_spp;
     float recip_sqrt_spp;
-
-    __device__ void initialize()
-    {
-        sqrt_spp = int(sqrtf(samples_per_pixel));
-        pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
-        recip_sqrt_spp = 1.0 / sqrt_spp;
-
-        camera_center = lookfrom;
-        float theta = degrees_to_radians(vfov);
-        float viewport_height = 2.0f * tanf(theta / 2.0f) * focus_dist;
-        float viewport_width = viewport_height * (float(image_width) / image_height);
-
-        w = unit_vector(lookfrom - lookat);
-        u = unit_vector(cross(vup, w));
-        v = cross(w, u);
-
-        vec3 viewport_u = viewport_width * u;
-        vec3 viewport_v = viewport_height * -v;
-        pixel_delta_u = viewport_u / image_width;
-        pixel_delta_v = viewport_v / image_height;
-
-        point3 viewport_upper_left = camera_center - focus_dist * w - viewport_u / 2.0f - viewport_v / 2.0f;
-        pixel00_loc = viewport_upper_left + 0.5f * (pixel_delta_u + pixel_delta_v);
-
-        float defocus_radius = focus_dist * tanf(degrees_to_radians(defocus_angle / 2.0f));
-        defocus_disk_u = u * defocus_radius;
-        defocus_disk_v = v * defocus_radius;
-    }
 
     __device__ color ray_color(const ray &r, hittable_list **world, hittable_list **lights, curandState *state)
     {
@@ -163,6 +144,12 @@ class camera
     float focus_dist = 10.0f;
     color background;
 
+    vec3 direction;
+    float init_theta;
+    float init_phi;
+    float zoom_scale;
+    float step_scale;
+
     __device__ camera() { initialize(); }
 
     __device__ camera(int image_width, int image_height)
@@ -188,7 +175,41 @@ class camera
         this->focus_dist = fmaxf(focus_dist, 1.0f);
         this->background = background;
 
+        this->direction = lookfrom - lookat;
+        this->init_theta = acosf(this->direction.y() / distance(lookfrom, lookat));
+        this->init_phi = atan2f(this->direction.x(), this->direction.z());
+        this->zoom_scale = 1.005;
+        this->step_scale = 0.6;
+
         initialize();
+    }
+
+    __device__ void initialize()
+    {
+        sqrt_spp = int(sqrtf(samples_per_pixel));
+        pixel_samples_scale = 1.0 / (sqrt_spp * sqrt_spp);
+        recip_sqrt_spp = 1.0 / sqrt_spp;
+
+        camera_center = lookfrom;
+        float theta = degrees_to_radians(vfov);
+        float viewport_height = 2.0f * tanf(theta / 2.0f) * focus_dist;
+        float viewport_width = viewport_height * (float(image_width) / image_height);
+
+        w = unit_vector(lookfrom - lookat);
+        u = unit_vector(cross(vup, w));
+        v = cross(w, u);
+
+        vec3 viewport_u = viewport_width * u;
+        vec3 viewport_v = viewport_height * -v;
+        pixel_delta_u = viewport_u / image_width;
+        pixel_delta_v = viewport_v / image_height;
+
+        point3 viewport_upper_left = camera_center - focus_dist * w - viewport_u / 2.0f - viewport_v / 2.0f;
+        pixel00_loc = viewport_upper_left + 0.5f * (pixel_delta_u + pixel_delta_v);
+
+        float defocus_radius = focus_dist * tanf(degrees_to_radians(defocus_angle / 2.0f));
+        defocus_disk_u = u * defocus_radius;
+        defocus_disk_v = v * defocus_radius;
     }
 
     __device__ void render(hittable_list **d_world, hittable_list **lights, int i, int j, curandState *state, uint8_t *output)
@@ -197,6 +218,51 @@ class camera
         color c = compute_pixel_color(i, j, d_world, lights, state);
         translate(c, pixel_index, output);
     }
+
+    __device__ void camera_rotate() {
+        float radialDistance = distance(lookfrom, lookat);
+        lookfrom = lookat + vec3(
+            radialDistance * sinf(init_theta) * sinf(init_phi),
+            radialDistance * cosf(init_theta),
+            radialDistance * sinf(init_theta) * cosf(init_phi)
+        );
+
+        init_phi += 0.1; 
+        if (init_phi >= 2 * PI) init_phi -= 2 * PI;
+
+        init_theta -= 0.01;
+        if (init_theta <= 0) init_theta = 0;
+    }
+
+    __device__ void camera_translate(CameraMovement direction) {
+        if (direction == FORWARD) {
+            lookfrom += w * step_scale;
+            lookat += w * step_scale;
+            focus_dist += step_scale;
+        }
+        if (direction == BACKWARD) {
+            lookfrom += w * -step_scale;
+            lookat += w * -step_scale;
+            focus_dist -= step_scale;
+        }
+        if (direction == LEFT) {
+            lookfrom += u * -step_scale;
+            lookat += u * -step_scale;
+        }
+        if (direction == RIGHT) {
+            lookfrom += u * step_scale;
+            lookat += u * step_scale;
+        }
+        if (direction == UP) {
+            lookfrom += v * step_scale;
+            lookat += v * step_scale;
+        }
+        if (direction == DOWN) {
+            lookfrom += v * -step_scale;
+            lookat += v * -step_scale;
+        }
+    }
+
 };
 
 #endif
