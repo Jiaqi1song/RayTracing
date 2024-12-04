@@ -12,19 +12,14 @@
 
 #include <cstdlib>
 #include <iostream>
-
+#include <fstream>
+#include <sstream>
 
 class rtw_image {
   public:
     rtw_image() {}
 
     rtw_image(const char* image_filename) {
-        // Loads image data from the specified file. If the RTW_IMAGES environment variable is
-        // defined, looks only in that directory for the image file. If the image was not found,
-        // searches for the specified image file first from the current directory, then in the
-        // images/ subdirectory, then the _parent's_ images/ subdirectory, and then _that_
-        // parent, on so on, for six levels up. If the image was not loaded successfully,
-        // width() and height() will return 0.
 
         auto filename = std::string(image_filename);
         auto imagedir = getenv("RTW_IMAGES");
@@ -49,11 +44,6 @@ class rtw_image {
     }
 
     bool load(const std::string& filename) {
-        // Loads the linear (gamma=1) image data from the given file name. Returns true if the
-        // load succeeded. The resulting data buffer contains the three [0.0, 1.0]
-        // floating-point values for the first pixel (red, then green, then blue). Pixels are
-        // contiguous, going left to right for the width of the image, followed by the next row
-        // below, for the full height of the image.
 
         auto n = bytes_per_pixel; // Dummy out parameter: original components per pixel
         fdata = stbi_loadf(filename.c_str(), &image_width, &image_height, &n, bytes_per_pixel);
@@ -119,6 +109,67 @@ class rtw_image {
     }
 };
 
+void parse_obj(const char* filename, 
+                std::vector<vec3>& points, 
+                std::vector<vec3>& idxVertex, 
+                int& nPoints, 
+                int& nTriangles) {
+
+    std::ifstream objFile(filename); 
+    if (!objFile.is_open()) {
+        std::cerr << "Error: Cannot open the OBJ file: " << filename << std::endl;
+        return;
+    }
+
+    int np = 0, nt = 0; // Initialize counters for vertices and triangles
+    std::string line;
+
+    while (std::getline(objFile, line)) {
+        std::stringstream ss(line);
+        std::string label;
+        ss >> label;
+
+        if (label == "v") {
+            vec3 vertex;
+            ss >> vertex[0] >> vertex[1] >> vertex[2];
+            points[np++] = vertex;
+        } else if (label == "f") {
+            vec3 idx;
+            ss >> idx[0] >> idx[1] >> idx[2];
+            idx[0] -= 1; idx[1] -= 1; idx[2] -= 1; // Adjust to 0-based indexing
+            idxVertex[nt++] = idx;
+        }
+    }
+
+    objFile.close(); // Close the file
+
+    // Update the number of vertices and triangles
+    nPoints = np;
+    nTriangles = nt;
+
+    // Optional: Centering and scaling
+    vec3 mean = vec3(0, 0, 0);
+    for (int i = 0; i < nPoints; i++) {
+        mean += points[i];
+    }
+    mean /= float(nPoints);
+
+    for (int i = 0; i < nPoints; i++) {
+        points[i] += -mean;
+    }
+
+    float maxDistance = 0.0f;
+    for (int i = 0; i < nPoints; i++) {
+        float dist = points[i].length();
+        if (dist > maxDistance) {
+            maxDistance = dist;
+        }
+    }
+
+    for (int i = 0; i < nPoints; i++) {
+        points[i] /= maxDistance;
+    }
+}                
 
 // Restore MSVC compiler warnings
 #ifdef _MSC_VER

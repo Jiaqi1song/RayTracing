@@ -2,7 +2,7 @@
 
 #### Jiaqi Song (<jiaqison@andrew.cmu.edu>), Xinping Luo (<xinpingl@andrew.cmu.edu>)
 
-We use the CPU start code from [Ray Tracing in One Weekend series](https://raytracing.github.io/). We plan to use OpenMP and CUDA to accelerate the rendering process.
+We use the CPU start code from [Ray Tracing in One Weekend series](https://raytracing.github.io/). In addition to the basic features of the three books, we have incorporated support for triangles and meshes, as well as animations for moving cameras and moving objects. We plan to use OpenMP and CUDA to accelerate the rendering process. Our project website: [Ray Tracing in CUDA](https://raytracingcuda.github.io/).
 
 ## Check List
 
@@ -13,6 +13,7 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 - [x] Shared image data address
 - [x] Use OpenMP and BVH to accelerate
 - [x] Animation
+- [x] Triangle and Mesh
 
 ### CUDA Renderer
 
@@ -20,7 +21,8 @@ We use the CPU start code from [Ray Tracing in One Weekend series](https://raytr
 - [x] Benchmark test case
 - [x] Monte Carlo sampling on CUDA 
 - [x] BVH acceleration on CUDA 
-- [ ] Animation
+- [x] Animation
+- [x] Triangle and Mesh
 
 ## Compile and run the ray tracer (modify the parameters in the script)
 
@@ -30,7 +32,7 @@ bash render.sh
 
 ## Reference output image
 
-### First Scene Animation (rotate + zoom)
+### First Scene Animation (rotate)
 ![image](./images/animation1.gif)
 
 ### First Scene Animation (translate)
@@ -45,6 +47,8 @@ bash render.sh
 ### Cornell Box
 ![image](./images/cornell_box.png)
 
-### Final scene
+### Final Scene
 ![image](./images/final_scene.png)
 
+### Mesh Scene
+![image](./images/mesh_scene.png)

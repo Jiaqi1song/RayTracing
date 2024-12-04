@@ -21,6 +21,7 @@ set ( CPURENDERER
   src/cpu/cpuRenderer.cpp
   src/cpu/stb_image.h
   src/cpu/aabb.h
+  src/cpu/triangle.h
   src/cpu/camera.h
   src/cpu/color.h
   src/cpu/constant_medium.h
@@ -45,6 +46,7 @@ set ( GPURENDERER
   src/cuda/cudaRenderer.cu
   src/cuda/aabb.h
   src/cuda/bvh.h
+  src/cuda/triangle.h
   src/cuda/camera.h
   src/cuda/color.h
   src/cuda/constant_medium.h

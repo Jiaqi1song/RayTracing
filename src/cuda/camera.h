@@ -176,7 +176,7 @@ class camera
         this->background = background;
 
         this->direction = lookfrom - lookat;
-        this->init_theta = acosf(this->direction.y() / this->direction.length());
+        this->init_theta = acosf(this->direction.y() / distance(lookfrom, lookat));
         this->init_phi = atan2f(this->direction.x(), this->direction.z());
         this->zoom_scale = 1.005;
         this->step_scale = 0.6;
@@ -220,22 +220,18 @@ class camera
     }
 
     __device__ void camera_rotate() {
-        float radialDistance = (lookfrom - lookat).length();
-        lookfrom = vec3(
+        float radialDistance = distance(lookfrom, lookat);
+        lookfrom = lookat + vec3(
             radialDistance * sinf(init_theta) * sinf(init_phi),
             radialDistance * cosf(init_theta),
             radialDistance * sinf(init_theta) * cosf(init_phi)
-        ) + lookat;
+        );
 
         init_phi += 0.1; 
         if (init_phi >= 2 * PI) init_phi -= 2 * PI;
+
         init_theta -= 0.01;
         if (init_theta <= 0) init_theta = 0;
-    }
-
-    __device__ void camera_zoom() {
-        lookfrom = direction * zoom_scale + lookat;
-        focus_dist *= zoom_scale;
     }
 
     __device__ void camera_translate(CameraMovement direction) {

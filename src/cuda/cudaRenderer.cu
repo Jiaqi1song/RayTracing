@@ -4,6 +4,7 @@
 #include "quad.h"
 #include "constant_medium.h"
 #include "bvh.h"
+// #include "triangle.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -259,8 +260,8 @@ __global__ void rand_init(curandState *rand_state, unsigned long seed) {
 __global__ void move_camera(camera **cam, int animation_method, int frame) {
     if (animation_method == 0) {
         (*cam)->camera_rotate();
-        (*cam)->camera_zoom();
     }
+    
     if (animation_method == 1) {
         if (frame < 7) {
             (*cam)->camera_translate(FORWARD);

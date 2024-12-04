@@ -8,6 +8,7 @@
 #include "quad.h"
 #include "sphere.h"
 #include "texture.h"
+#include "triangle.h"
 
 #include <iomanip> 
 #include <iostream>
@@ -15,7 +16,7 @@
 #include <string>
 #include <cstdlib>
 
-void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method, int total_frame, int frame) {
+void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, int animation_method, int total_frame, int frame) {
     hittable_list world;
 
     double height1 = 1.0;
@@ -69,7 +70,6 @@ void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pi
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename1;
-    renderer.critical_section  = critical_section;
     renderer.use_bvh           = use_bvh; 
 
     renderer.vfov     = 24;
@@ -83,7 +83,7 @@ void first_scene_moving(int image_width, double aspect_ratio, int samples_per_pi
     renderer.render(world, lights);
 }
 
-void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method) {
+void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, int animation_method) {
     hittable_list world;
 
     auto checker = make_shared<checker_texture>(0.32, color(.8, .1, .1), color(.9, .9, .9));
@@ -144,7 +144,6 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
-    renderer.critical_section  = critical_section;
     renderer.use_bvh           = use_bvh; 
 
     renderer.vfov     = 20;
@@ -164,8 +163,68 @@ void first_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     
 }
 
+void mesh_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, int animation_method) {
+    hittable_list world;
 
-void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method) {
+    auto red   = make_shared<lambertian>(color(.65, .05, .05));
+    auto white = make_shared<lambertian>(color(.73, .73, .73));
+    auto green = make_shared<lambertian>(color(.12, .45, .15));
+    auto light = make_shared<diffuse_light>(color(15, 15, 15));
+
+    // Cornell box sides
+    world.add(make_shared<quad>(point3(555,0,0), vec3(0,0,555), vec3(0,555,0), green));
+    world.add(make_shared<quad>(point3(0,0,555), vec3(0,0,-555), vec3(0,555,0), red));
+    world.add(make_shared<quad>(point3(0,555,0), vec3(555,0,0), vec3(0,0,555), white));
+    world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,0,-555), white));
+    world.add(make_shared<quad>(point3(555,0,555), vec3(-555,0,0), vec3(0,555,0), white));
+
+    // Light
+    world.add(make_shared<quad>(point3(213,554,227), vec3(130,0,0), vec3(0,0,105), light));
+
+    // Mesh
+    auto metal_box = make_shared<metal>(color(0.8, 0.85, 0.88), 0.0);
+    hittable_list mesh1 = build_mesh("./shapes/small_bunny.obj", metal_box, 230, use_bvh);
+    world.add(make_shared<translate>(make_shared<rotate_y>(make_shared<hittable_list>(mesh1), 180), vec3(265,120,295)));
+
+    // If use BVH to accelrate the rendering process
+    if (use_bvh) world = hittable_list(make_shared<bvh_node>(world));
+
+    // Light Sources
+    auto empty_material = shared_ptr<material>();
+    hittable_list lights;
+    lights.add(
+        make_shared<quad>(point3(343,554,332), vec3(-130,0,0), vec3(0,0,-105), empty_material));
+    lights.add(make_shared<sphere>(point3(190, 90, 190), 90, empty_material));
+
+    camera renderer;
+
+    renderer.aspect_ratio      = aspect_ratio;
+    renderer.image_width       = image_width;
+    renderer.samples_per_pixel = samples_per_pixel;
+    renderer.max_depth         = max_depth;
+    renderer.background        = color(0,0,0);
+    renderer.use_openmp        = use_openmp;
+    renderer.num_threads       = num_threads;
+    renderer.filename          = filename;
+    renderer.use_bvh           = use_bvh;
+
+    renderer.vfov     = 40;
+    renderer.lookfrom = point3(278, 278, -800);
+    renderer.lookat   = point3(278, 278, 0);
+    renderer.vup      = vec3(0, 1, 0);
+
+    renderer.defocus_angle = 0;
+
+    if (animation) {
+        renderer.render_animation(world, lights);
+        renderer.animation_method = animation_method;
+    } else {
+        renderer.render(world, lights);
+    }
+}
+
+
+void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, int animation_method) {
     hittable_list world;
 
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
@@ -214,7 +273,6 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
-    renderer.critical_section  = critical_section;
     renderer.use_bvh           = use_bvh;
 
     renderer.vfov     = 40;
@@ -232,7 +290,7 @@ void cornell_box(int image_width, double aspect_ratio, int samples_per_pixel, in
     }
 }
 
-void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, bool critical_section, int animation_method) {
+void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, int max_depth, bool use_openmp, int num_threads, std::string filename, bool use_bvh, bool animation, int animation_method) {
     hittable_list boxes1;
     auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
 
@@ -324,7 +382,6 @@ void final_scene(int image_width, double aspect_ratio, int samples_per_pixel, in
     renderer.use_openmp        = use_openmp;
     renderer.num_threads       = num_threads;
     renderer.filename          = filename;
-    renderer.critical_section  = critical_section;
     renderer.use_bvh           = use_bvh;
 
     renderer.vfov     = 40;
@@ -351,7 +408,6 @@ int main(int argc, char* argv[]) {
     bool use_openmp = true;
     bool use_bvh = true;
     int num_threads = 10;
-    bool critical_section = false;
 
     // Animation (0: zoom + rotate. 1: translate. 2: bounce sphere)
     bool animation = true;
@@ -375,9 +431,8 @@ int main(int argc, char* argv[]) {
         use_openmp = std::string(argv[6]) == "true";
         use_bvh = std::string(argv[7]) == "true";
         num_threads = std::atoi(argv[8]);
-        critical_section = std::string(argv[9]) == "true";
-        image_width = std::atoi(argv[10]);
-        image_height = std::atoi(argv[11]);
+        image_width = std::atoi(argv[9]);
+        image_height = std::atoi(argv[10]);
         aspect_ratio = double(image_width) / double(image_height);
     }
 
@@ -391,13 +446,14 @@ int main(int argc, char* argv[]) {
     if (animation && animation_method == 2) {
         int total_frame = 20;
         for (int frame = 0; frame < total_frame; ++frame) {
-            first_scene_moving(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method, total_frame, frame);
+            first_scene_moving(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, animation_method, total_frame, frame);
         }
     } else {
         switch (scene) {
-            case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
-            case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
-            case 3:  final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, critical_section, animation_method);     break;
+            case 1:  first_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, animation_method);     break;
+            case 2:  cornell_box(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, animation_method);     break;
+            case 3:  final_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, animation_method);     break;
+            case 4:   mesh_scene(image_width, aspect_ratio, samples_per_pixel, max_depth, use_openmp, num_threads, filename, use_bvh, animation, animation_method);     break;
         }
     }
     
