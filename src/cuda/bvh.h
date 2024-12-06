@@ -55,6 +55,7 @@ struct StaticStack {
     }
 
     __device__ T pop() {
+        if (size_ == 0) return nullptr;
         return data_[--size_];
     }
 
@@ -75,30 +76,54 @@ public:
 
     __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState* state) const override {
         
-        StaticStack<hittable*, 16> stack;
+        StaticStack<hittable*, 32> stack;
         hittable* root = (hittable*) this;
-        stack.push(root);
 
         bool hit_anything = false;
-        interval closest_so_far = ray_t;
+        hit_record tmp_rec;
+        float closest_t = ray_t.max;
 
-        // Pre-order tree traversal
-        while (!stack.empty()) {
-            hittable* current = stack.pop();
-            if (!current->bbox.hit(r, closest_so_far))
-                continue;
+        // Iteration tree traversal
+        bvh_node* node = (bvh_node*) root;
+        if (!node->bbox.hit(r, interval(ray_t.min, closest_t))) return false;
 
-            if (current->is_bvh) {
-                bvh_node* node = (bvh_node*) current;
-                stack.push(node->right);
-                stack.push(node->left);
-            } else {
-                if (current->hit(r, closest_so_far, rec, state)) {
+        do {
+            hittable* left_node = (hittable*) node->left;
+            hittable* right_node = (hittable*) node->right;
+
+            bool overlap_left = false;
+            bool overlap_right = false;
+
+            if (left_node) overlap_left = left_node->bbox.hit(r, interval(ray_t.min, closest_t));
+            if (right_node) overlap_right = right_node->bbox.hit(r, interval(ray_t.min, closest_t));
+
+            if (overlap_left && !left_node->is_bvh) {
+                if (left_node->hit(r, interval(ray_t.min, closest_t), tmp_rec, state)) {
                     hit_anything = true;
-                    closest_so_far.max = rec.t;
+                    closest_t = tmp_rec.t;
+                    rec = tmp_rec;
                 }
             }
-        }
+
+            if (overlap_right && !right_node->is_bvh) {
+                if (right_node->hit(r, interval(ray_t.min, closest_t), tmp_rec, state)) {
+                    hit_anything = true;
+                    closest_t = tmp_rec.t;
+                    rec = tmp_rec;
+                }
+            }
+
+            bool traverse_left = (overlap_left && left_node->is_bvh);
+            bool traverse_right = (overlap_right && right_node->is_bvh);
+
+            if (!traverse_left && !traverse_right) {
+                node = (bvh_node*) stack.pop(); 
+            } else {
+                node = (bvh_node*) ((traverse_left) ? left_node : right_node);
+                if (traverse_left && traverse_right) stack.push(right_node); 
+            }
+
+        } while (!(node == nullptr));
 
         return hit_anything;
     }

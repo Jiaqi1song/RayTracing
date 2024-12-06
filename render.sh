@@ -12,7 +12,7 @@ render=cuda
 #   2: cornell_box (13   objs)
 #   3: final_scene (3409 objs)
 #   4: mesh_scene  (4974 objs)
-scene=4
+scene=1
 
 # Image size
 image_width=600
@@ -32,7 +32,7 @@ use_openmp=true;
 num_threads=8;
 
 # Select if use BVH for CPU or CUDA 
-use_bvh=false;
+use_bvh=true;
 
 # Number of sample and depth
 samples_per_pixel=200
