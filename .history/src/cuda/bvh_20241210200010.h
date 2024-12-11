@@ -63,6 +63,7 @@ public:
         // Pre-order tree traversal
         while (!stack->empty()) {
             hittable* current = stack->pop();
+            printf(current->bbox.flag);
             if (!current->bounding_box().hit(r, closest_so_far))
                 continue;
 

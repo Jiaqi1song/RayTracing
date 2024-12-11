@@ -235,6 +235,7 @@ class rotate_y : public hittable {
     hittable *object;
     float sin_theta;
     float cos_theta;
+    
 };
 
 

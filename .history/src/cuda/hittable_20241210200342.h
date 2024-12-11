@@ -58,6 +58,7 @@ public:
     __device__ virtual HittableType get_type() const = 0; 
     __device__ virtual float pdf_value(const point3& origin, const vec3& direction, curandState *state) const { return 0.0;}
     __device__ virtual vec3 random(const point3& origin, curandState *state) const {return vec3(1,0,0);}
+    aabb bbox;
     bool is_bvh = false;
 };
 
@@ -74,6 +75,7 @@ public:
         {
             bbox = aabb(bbox, objects[i]->bounding_box());
         }
+        bbox.flag = 1;
     }
 
     __device__ HittableType get_type() const override { return HittableType::HITTABLE_LIST; }
@@ -235,6 +237,7 @@ class rotate_y : public hittable {
     hittable *object;
     float sin_theta;
     float cos_theta;
+    
 };
 
 

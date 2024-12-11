@@ -74,6 +74,7 @@ public:
         {
             bbox = aabb(bbox, objects[i]->bounding_box());
         }
+        bbox.flag = 1;
     }
 
     __device__ HittableType get_type() const override { return HittableType::HITTABLE_LIST; }
@@ -235,6 +236,7 @@ class rotate_y : public hittable {
     hittable *object;
     float sin_theta;
     float cos_theta;
+    
 };
 
 

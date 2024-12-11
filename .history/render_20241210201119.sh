@@ -36,7 +36,7 @@ use_bvh=true;
 
 # Number of sample and depth
 samples_per_pixel=200
-max_depth=50
+max_depth=
 
 if [ "$render" = "cpu" ]; then
     echo "Running CPU Ray Tracer..."

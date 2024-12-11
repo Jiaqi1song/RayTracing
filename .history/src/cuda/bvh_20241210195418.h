@@ -63,7 +63,8 @@ public:
         // Pre-order tree traversal
         while (!stack->empty()) {
             hittable* current = stack->pop();
-            if (!current->bounding_box().hit(r, closest_so_far))
+
+            if (!reinterpret_cast(current)->bbox.hit(r, closest_so_far))
                 continue;
 
             if (current->is_bvh) {
