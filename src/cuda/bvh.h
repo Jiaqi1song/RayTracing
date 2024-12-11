@@ -55,6 +55,7 @@ struct StaticStack {
     }
 
     __device__ T pop() {
+        if (size_ == 0) return nullptr;
         return data_[--size_];
     }
 
@@ -75,17 +76,19 @@ public:
 
     __device__ bool hit(const ray& r, const interval& ray_t, hit_record& rec, curandState* state) const override {
         
-        StaticStack<hittable*, 16> stack;
+        StaticStack<hittable*, 32> stack;
         hittable* root = (hittable*) this;
+
         stack.push(root);
 
         bool hit_anything = false;
+        hit_record tmp_rec;
         interval closest_so_far = ray_t;
 
         // Pre-order tree traversal
         while (!stack.empty()) {
             hittable* current = stack.pop();
-            if (!current->bbox.hit(r, closest_so_far))
+            if (!current->bounding_box().hit(r, closest_so_far))
                 continue;
 
             if (current->is_bvh) {
@@ -93,9 +96,10 @@ public:
                 stack.push(node->right);
                 stack.push(node->left);
             } else {
-                if (current->hit(r, closest_so_far, rec, state)) {
+                if (current->hit(r, closest_so_far, tmp_rec, state)) {
                     hit_anything = true;
-                    closest_so_far.max = rec.t;
+                    closest_so_far.max = tmp_rec.t;
+                    rec = tmp_rec;
                 }
             }
         }
@@ -103,7 +107,7 @@ public:
         return hit_anything;
     }
 
-    __device__ friend hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state);
+    __device__ friend hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t start, size_t end, curandState* state);
 
     __device__ aabb bounding_box() const override { return bbox; }
 
@@ -133,12 +137,12 @@ __device__ static bool box_z_compare(const hittable* a, const hittable* b) {
     return box_compare(a, b, 2);
 }
 
-__device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state) {
+__device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t start, size_t end, curandState* state) {
 
     DynamicStack<BVH_Node> stack(bvh_data, 5000);
     
     bvh_node* root = new bvh_node();
-    stack.push(BVH_Node{ root, 0, object_count });
+    stack.push(BVH_Node{ root, start, end });
 
     while (!stack.empty()) {
         BVH_Node current = stack.pop();

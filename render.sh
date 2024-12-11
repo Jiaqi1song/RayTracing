@@ -32,7 +32,7 @@ use_openmp=true;
 num_threads=8;
 
 # Select if use BVH for CPU or CUDA 
-use_bvh=false;
+use_bvh=true;
 
 # Number of sample and depth
 samples_per_pixel=200
