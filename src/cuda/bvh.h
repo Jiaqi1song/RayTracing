@@ -79,56 +79,35 @@ public:
         StaticStack<hittable*, 32> stack;
         hittable* root = (hittable*) this;
 
+        stack.push(root);
+
         bool hit_anything = false;
         hit_record tmp_rec;
-        float closest_t = ray_t.max;
+        interval closest_so_far = ray_t;
 
-        // Iteration tree traversal
-        bvh_node* node = (bvh_node*) root;
-        if (!node->bbox.hit(r, interval(ray_t.min, closest_t))) return false;
+        // Pre-order tree traversal
+        while (!stack.empty()) {
+            hittable* current = stack.pop();
+            if (!current->bounding_box().hit(r, closest_so_far))
+                continue;
 
-        do {
-            hittable* left_node = (hittable*) node->left;
-            hittable* right_node = (hittable*) node->right;
-
-            bool overlap_left = false;
-            bool overlap_right = false;
-
-            if (left_node) overlap_left = left_node->bbox.hit(r, interval(ray_t.min, closest_t));
-            if (right_node) overlap_right = right_node->bbox.hit(r, interval(ray_t.min, closest_t));
-
-            if (overlap_left && !left_node->is_bvh) {
-                if (left_node->hit(r, interval(ray_t.min, closest_t), tmp_rec, state)) {
-                    hit_anything = true;
-                    closest_t = tmp_rec.t;
-                    rec = tmp_rec;
-                }
-            }
-
-            if (overlap_right && !right_node->is_bvh) {
-                if (right_node->hit(r, interval(ray_t.min, closest_t), tmp_rec, state)) {
-                    hit_anything = true;
-                    closest_t = tmp_rec.t;
-                    rec = tmp_rec;
-                }
-            }
-
-            bool traverse_left = (overlap_left && left_node->is_bvh);
-            bool traverse_right = (overlap_right && right_node->is_bvh);
-
-            if (!traverse_left && !traverse_right) {
-                node = (bvh_node*) stack.pop(); 
+            if (current->is_bvh) {
+                bvh_node* node = (bvh_node*) current;
+                stack.push(node->right);
+                stack.push(node->left);
             } else {
-                node = (bvh_node*) ((traverse_left) ? left_node : right_node);
-                if (traverse_left && traverse_right) stack.push(right_node); 
+                if (current->hit(r, closest_so_far, tmp_rec, state)) {
+                    hit_anything = true;
+                    closest_so_far.max = tmp_rec.t;
+                    rec = tmp_rec;
+                }
             }
-
-        } while (!(node == nullptr));
+        }
 
         return hit_anything;
     }
 
-    __device__ friend hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state);
+    __device__ friend hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t start, size_t end, curandState* state);
 
     __device__ aabb bounding_box() const override { return bbox; }
 
@@ -158,12 +137,12 @@ __device__ static bool box_z_compare(const hittable* a, const hittable* b) {
     return box_compare(a, b, 2);
 }
 
-__device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t object_count, curandState* state) {
+__device__ hittable* build_bvh_node(hittable** objects, BVH_Node *bvh_data, size_t start, size_t end, curandState* state) {
 
     DynamicStack<BVH_Node> stack(bvh_data, 5000);
     
     bvh_node* root = new bvh_node();
-    stack.push(BVH_Node{ root, 0, object_count });
+    stack.push(BVH_Node{ root, start, end });
 
     while (!stack.empty()) {
         BVH_Node current = stack.pop();

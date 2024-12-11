@@ -68,7 +68,7 @@ __global__ void create_world1(hittable **d_list, BVH_Node *bvh_data, hittable_li
     d_list[i++] = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, new metal(color(0.7f, 0.6f, 0.5f), 0.0f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        d_list[0] = build_bvh_node(d_list, bvh_data, 0, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -112,8 +112,8 @@ __global__ void create_world2(hittable **d_list, BVH_Node *bvh_data, hittable_li
     d_list[i++] = new sphere(point3(190.0f,90.0f,190.0f), 90.0f, new dielectric(1.5f));
     
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
-        *d_world = new hittable_list(d_list, 1);
+        d_list[6] = build_bvh_node(d_list, bvh_data, 6, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 7);
     } else {
         *d_world = new hittable_list(d_list, i);
     }
@@ -191,7 +191,7 @@ __global__ void create_world3(hittable **d_list, BVH_Node *bvh_data, hittable_li
     }
 
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
+        d_list[0] = build_bvh_node(d_list, bvh_data, 0, i, local_rand_state);
         *d_world = new hittable_list(d_list, 1);
     } else {
         *d_world = new hittable_list(d_list, i);
@@ -255,8 +255,8 @@ __global__ void create_world4(hittable **d_list, BVH_Node *bvh_data, hittable_li
     }
 
     if (use_bvh) {
-        d_list[0] = build_bvh_node(d_list, bvh_data, i, local_rand_state);
-        *d_world = new hittable_list(d_list, 1);
+        d_list[6] = build_bvh_node(d_list, bvh_data, 6, i, local_rand_state);
+        *d_world = new hittable_list(d_list, 7);
     } else {
         *d_world = new hittable_list(d_list, i);
     }

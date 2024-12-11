@@ -12,7 +12,7 @@ render=cuda
 #   2: cornell_box (13   objs)
 #   3: final_scene (3409 objs)
 #   4: mesh_scene  (4974 objs)
-scene=1
+scene=4
 
 # Image size
 image_width=600
